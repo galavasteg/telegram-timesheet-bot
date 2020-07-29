@@ -1,0 +1,19 @@
+# DB
+*.db
+
+# PyCharm
+.idea/
+**/__pycache__
+
+# logs
+*.log
+
+# notebooks
+*.pickle
+*.pid
+*.out
+.ipynb_checkpoints
+
+# secrets
+*allowed_accounts.json
+.env
