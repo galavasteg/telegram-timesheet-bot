@@ -12,7 +12,7 @@ import messages as msgs
 from middlewares import AccessMiddleware
 from settings import LOG, ACCESS_IDS, TELEGRAM_API_TOKEN, DEBUG_MODE
 
-from database.db_manager import db_manager
+from database.db_manager import DBManager
 
 from datetime import datetime
 
@@ -34,7 +34,7 @@ bot = Bot(token=TELEGRAM_API_TOKEN)
 dp = Dispatcher(bot)
 dp.middleware.setup(AccessMiddleware(ACCESS_IDS))
 
-db = db_manager()
+db = DBManager()
 
 
 

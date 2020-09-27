@@ -1,29 +1,30 @@
-import sqlite3 as sl
-from database.change_scripts import tables, categories
-
+import sqlite3
 from uuid import uuid4 as uuid
-class db_manager:
+
+from . import sql
+
+
+class DBManager:
 
     def open_connection(function):
         def wrapper(self, *args):
-            with sl.connect('timesheet-db') as self.con:
+            with sqlite3.connect('timesheet-db') as self.con:
                 result = function(self, *args)
             return result
         return wrapper
 
     @open_connection
     def migrate(self):
-            self.create_tables(self.con)
-            self.populate_categories(self.con)
-
+        self.create_tables(self.con)
+        self.populate_categories(self.con)
 
     def create_tables(self, con):
-        for statement in tables:
-            con.execute(statement)
+        for query in sql.CREATE_TABLES:
+            con.execute(query)
 
     def populate_categories(self, con):
-        for statement in categories:
-            con.execute(statement)
+        for query in sql.CATEGORY_INSERTS:
+            con.execute(query)
 
     @open_connection
     def list_categories(self):
