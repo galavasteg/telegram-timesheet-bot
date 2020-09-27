@@ -33,7 +33,7 @@ class db_manager:
         for category in categories:
             result_list += 'Категория ' + str(category) + '\n'
 
-        return  result_list
+        return result_list
 
     @open_connection
     def try_add_user(self, user, creation_date):
@@ -51,10 +51,19 @@ class db_manager:
         existing_session = self._get_active_session_id_for_user(user_id)
 
         if existing_session.fetchone() == None:
+
+            default_interval = 20 * 60
+            previous_interval = self.con.execute('SELECT time_interval FROM session WHERE id = (SELECT MAX(id) from session WHERE user_telegram_id = :user_telegram_id)',
+                                                 {'user_telegram_id': user_id}).fetchone()
+            if previous_interval is None:
+                previous_interval = default_interval
+            else:
+                previous_interval = previous_interval[0]
+
             self.con.execute(
                 'INSERT INTO session(user_telegram_id, time_interval, session_start) VALUES (:user_telegram_id, :time_interval, :session_start)',
                 {'user_telegram_id': user_id,
-                 'time_interval': 10,
+                 'time_interval': previous_interval,
                  'session_start': start_date})
             return True
         else:
@@ -65,7 +74,7 @@ class db_manager:
         existing_session = self._get_active_session_id_for_user(user_id)
 
         fetched = existing_session.fetchone()
-        if  fetched != None:
+        if  fetched is not None:
             self.con.execute(
                 'UPDATE session SET session_stop = :session_stop where id = :id',
                 {'session_stop': stop_date,
@@ -104,6 +113,39 @@ class db_manager:
             {'session_id': self._get_active_session_id_for_user(user_id).fetchone()[0],
              'start_date': start_date,
              'uuid': str(uuid())})
+
+    @open_connection
+    def try_set_step(self, user_id, step):
+        session_id = self._get_active_session_id_for_user(user_id).fetchone()
+        if session_id is None:
+            return False
+
+        session_id = session_id[0]
+
+        res = self.con.execute(
+            """UPDATE session
+                set time_interval = :step
+                where id = :session_id""",
+            {'session_id': session_id,
+             'step': step})
+
+        return True
+
+    @open_connection
+    def try_get_step(self, user_id):
+        session_id = self._get_active_session_id_for_user(user_id).fetchone()
+        if session_id is None:
+            return False, None
+
+        session_id = session_id[0]
+
+        step = self.con.execute(
+            """SELECT time_interval
+                FROM session
+                WHERE id = :session_id""",
+            {'session_id': session_id}).fetchone()[0]
+
+        return True, step
 
 
     def _get_active_session_id_for_user(self, user_id):
