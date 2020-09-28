@@ -2,23 +2,19 @@
 Запускаемый сервер Telegram бота
 
 """
+import json
+import asyncio
+from datetime import datetime
 from typing import Callable
 
 from aiogram import Bot, Dispatcher, executor
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, \
-    InlineKeyboardMarkup, Message, CallbackQuery, ContentTypes
+from aiogram import types
 
 import messages as msgs
+from database.db_manager import DBManager
 from middlewares import AccessMiddleware
 from settings import LOG, ACCESS_IDS, TELEGRAM_API_TOKEN, DEBUG_MODE
 
-from database.db_manager import DBManager
-
-from datetime import datetime
-
-import json
-
-import asyncio
 
 # FIXME: wrong decoration of async funcs, use asyncref?
 def log_errors(func: Callable) -> Callable:
@@ -76,19 +72,19 @@ async def repeat(func, *args, **kwargs):
 
 @log_errors
 @dp.message_handler(commands=('help'))
-async def send_welcome(message: Message):
+async def send_welcome(message: types.Message):
     await message.answer(msgs.welcome)
 
 
 @log_errors
 @dp.message_handler(commands=('start'))
-async def send_start(message: Message):
+async def send_start(message: types.Message):
     if message.get_command(pure=True) == 'start':
         LOG.info('User: ' + message.from_user.get_mention())
     await start_routine(message)
 
 
-async def start_routine(message: Message):
+async def start_routine(message: types.Message):
     user = message.from_user
     now = datetime.now()
     db.try_add_user(user, now)
@@ -107,11 +103,11 @@ async def start_routine(message: Message):
 
 
 @dp.message_handler(commands=('stop'))
-async def send_stop(message: Message):
+async def send_stop(message: types.Message):
     await stop_routine(message)
 
 
-async def stop_routine(message: Message):
+async def stop_routine(message: types.Message):
     user = message.from_user
     now = datetime.now()
 
@@ -128,21 +124,21 @@ async def stop_routine(message: Message):
 
 @log_errors
 @dp.message_handler(commands=('list'))
-async def send_list(message: Message):
+async def send_list(message: types.Message):
     """Send "welcome" and info about bot usage to user"""
     msg = db.list_categories()
     await message.answer(msg)
 
 @log_errors
 @dp.message_handler(commands=('buttons'))
-async def send_list(message: Message):
+async def send_list(message: types.Message):
 
-    btn_start = KeyboardButton('Старт')
-    btn_stop = KeyboardButton('Стоп')
-    btn_change_step = KeyboardButton('Сменить интервал')
-    btn_report = KeyboardButton('Отчет')
+    btn_start = types.KeyboardButton('Старт')
+    btn_stop = types.KeyboardButton('Стоп')
+    btn_change_step = types.KeyboardButton('Сменить интервал')
+    btn_report = types.KeyboardButton('Отчет')
 
-    navigation_kb = ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    navigation_kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     navigation_kb.row(btn_start, btn_stop).row(btn_change_step, btn_report)
 
     await message.reply("Отображаем кнопки", reply_markup=navigation_kb)
@@ -151,20 +147,20 @@ async def send_list(message: Message):
 
 @log_errors
 @dp.message_handler(commands=('step'))
-async def send_set_step(message: Message):
+async def send_set_step(message: types.Message):
     await set_step_routine(message)
 
 
-async def set_step_routine(message: Message):
-    btn_10_minutes = InlineKeyboardButton('15 минут', callback_data='step_15')
-    btn_20_minutes = InlineKeyboardButton('20 минут', callback_data='step_20')
-    btn_30_minutes = InlineKeyboardButton('30 минут', callback_data='step_30')
+async def set_step_routine(message: types.Message):
+    btn_10_minutes = types.InlineKeyboardButton('15 минут', callback_data='step_15')
+    btn_20_minutes = types.InlineKeyboardButton('20 минут', callback_data='step_20')
+    btn_30_minutes = types.InlineKeyboardButton('30 минут', callback_data='step_30')
 
-    btn_5_second = InlineKeyboardButton('5 секунд (тест)', callback_data='step_5_s')
-    btn_10_seconds = InlineKeyboardButton('10 секунд (тест)', callback_data='step_10_s')
-    btn_30_seconds = InlineKeyboardButton('30 секунд (тест)', callback_data='step_30_s')
+    btn_5_second = types.InlineKeyboardButton('5 секунд (тест)', callback_data='step_5_s')
+    btn_10_seconds = types.InlineKeyboardButton('10 секунд (тест)', callback_data='step_10_s')
+    btn_30_seconds = types.InlineKeyboardButton('30 секунд (тест)', callback_data='step_30_s')
 
-    buttons = InlineKeyboardMarkup() \
+    buttons = types.InlineKeyboardMarkup() \
         .row(btn_10_minutes, btn_20_minutes, btn_30_minutes) \
         .row(btn_5_second, btn_10_seconds, btn_30_seconds)
 
@@ -173,8 +169,8 @@ async def set_step_routine(message: Message):
                            reply_markup=buttons)
 
 
-@dp.message_handler(content_types=ContentTypes.ANY)
-async def all_other_messages(message: Message):
+@dp.message_handler(content_types=types.ContentTypes.ANY)
+async def all_other_messages(message: types.Message):
     if message.text == 'Старт':
         await start_routine(message)
     elif message.text == 'Стоп':
@@ -191,24 +187,24 @@ async def periodic(*args):
     data = {'name':'','date':date}
 
     data['name'] = 'Работа'
-    work_btn = InlineKeyboardButton('Работа', callback_data=json.dumps(data, ensure_ascii=False))
+    work_btn = types.InlineKeyboardButton('Работа', callback_data=json.dumps(data, ensure_ascii=False))
 
     data['name'] = 'TimeKiller'
-    time_killer_btn = InlineKeyboardButton('TimeKiller', callback_data=json.dumps(data, ensure_ascii=False))
+    time_killer_btn = types.InlineKeyboardButton('TimeKiller', callback_data=json.dumps(data, ensure_ascii=False))
 
     data['name'] = 'Еда'
-    food_btn = InlineKeyboardButton('Еда', callback_data=json.dumps(data, ensure_ascii=False))
+    food_btn = types.InlineKeyboardButton('Еда', callback_data=json.dumps(data, ensure_ascii=False))
 
     data['name'] = 'Гулять'
-    walk_btn = InlineKeyboardButton('Гулять', callback_data=json.dumps(data, ensure_ascii=False))
+    walk_btn = types.InlineKeyboardButton('Гулять', callback_data=json.dumps(data, ensure_ascii=False))
 
     data['name'] = 'Тренировка'
-    workout_btn = InlineKeyboardButton('Тренировка', callback_data=json.dumps(data, ensure_ascii=False))
+    workout_btn = types.InlineKeyboardButton('Тренировка', callback_data=json.dumps(data, ensure_ascii=False))
 
     data['name'] = 'Сон'
-    sleep_btn = InlineKeyboardButton('Сон', callback_data=json.dumps(data, ensure_ascii=False))
+    sleep_btn = types.InlineKeyboardButton('Сон', callback_data=json.dumps(data, ensure_ascii=False))
 
-    buttons = InlineKeyboardMarkup()\
+    buttons = types.InlineKeyboardMarkup()\
         .row(work_btn, time_killer_btn, food_btn)\
         .row(walk_btn, workout_btn, sleep_btn)
 
@@ -222,7 +218,7 @@ async def periodic(*args):
         await bot.send_message(user_id, 'Ошибка получения интервала')
 
 @dp.callback_query_handler(lambda c: 'name' in c.data and 'date' in c.data)
-async def process_callback_button1(callback_query: CallbackQuery):
+async def process_callback_button1(callback_query: types.CallbackQuery):
     await bot.answer_callback_query(callback_query.id)
 
     data = json.loads(callback_query.data)
@@ -236,7 +232,7 @@ async def process_callback_button1(callback_query: CallbackQuery):
 
 
 @dp.callback_query_handler(lambda c: 'step' in c.data)
-async def process_callback_button1(callback_query: CallbackQuery):
+async def process_callback_button1(callback_query: types.CallbackQuery):
     await bot.answer_callback_query(callback_query.id)
 
     cmd = callback_query.data
