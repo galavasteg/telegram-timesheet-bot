@@ -64,4 +64,8 @@ with open(str(access_ids_file)) as f:
     ACCESS_IDS = set(json.load(f))
 
 
+DB_NAME = 'database/timesheet.db'
+DB_MIGRATIONS_DIR = 'database/migrations'
+
+
 DEFAULT_INTERVAL_SECONDS = 60 * 15
