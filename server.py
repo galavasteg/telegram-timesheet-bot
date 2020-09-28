@@ -62,7 +62,7 @@ async def repeat(func, *args, **kwargs):
     """
     while not stop_sending.is_set():
         user_id = args[0]
-        (fetched, step) = await get_interval(user_id)
+        fetched, step = await get_interval(user_id)
 
         if fetched:
             await asyncio.gather(
@@ -91,13 +91,10 @@ async def start_routine(message: types.Message):
 
     started = db.try_start_session(user.id, now)
 
-    reply = 'Стартуем'
-    if started == False:
-        reply = 'Уже стартовали'
-
+    reply = 'Стартуем' if started is False else 'Уже стартовали'
     await message.answer(reply)
 
-    if started == True:
+    if started is True:
         stop_sending.clear()
         await repeat(periodic, user.id)
 
