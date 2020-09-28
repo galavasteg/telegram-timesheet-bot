@@ -26,17 +26,17 @@ def log_errors(func: Callable) -> Callable:
     return decorator
 
 
-bot = Bot(token=TELEGRAM_API_TOKEN)
-dp = Dispatcher(bot)
-dp.middleware.setup(AccessMiddleware(ACCESS_IDS))
 
 db = DBManager()
 
-
+bot = Bot(token=settings.TELEGRAM_API_TOKEN)
+dp = Dispatcher(bot)
+dp.middleware.setup(AccessMiddleware(settings.ACCESS_IDS))
 
 stop_sending = asyncio.Event()
 lock = asyncio.Lock()
 interval = 15
+
 
 async def get_interval(user_id):
     await lock.acquire()
@@ -275,7 +275,7 @@ async def process_callback_button1(callback_query: types.CallbackQuery):
             reply = error_msg
     await bot.send_message(callback_query.from_user.id, reply)
 
+
 if __name__ == '__main__':
     db.migrate()
     executor.start_polling(dp, skip_updates=True)
-

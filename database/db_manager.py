@@ -102,7 +102,7 @@ class DBManager:
              'category': category}).rowcount
         self._con.commit()
 
-        return rowcount == 1;
+        return rowcount == 1
 
     def start_event(self, user_id, start_date):
         res = self._cursor.execute(
@@ -145,9 +145,6 @@ class DBManager:
 
         return True, step
 
-
     def _get_active_session_id_for_user(self, user_id):
         return self._cursor.execute('SELECT id FROM session WHERE user_telegram_id = :user_telegram_id AND session_stop is NULL',
                                          {'user_telegram_id': user_id})
-
-
