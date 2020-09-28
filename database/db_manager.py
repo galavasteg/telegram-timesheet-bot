@@ -7,13 +7,6 @@ from settings.config import DB_NAME, DB_MIGRATIONS_DIR
 
 class DBManager:
 
-    def open_connection(function):
-        def wrapper(self, *args):
-            with sqlite3.connect('timesheet-db') as self.con:
-                result = function(self, *args)
-            return result
-        return wrapper
-
     def __init__(self):
         self._con = sqlite3.Connection(DB_NAME)
         self._cursor = self._con.cursor()
@@ -31,7 +24,6 @@ class DBManager:
             self._cursor.executescript(sql)
             self._con.commit()
 
-    @open_connection
     def list_categories(self):
         categories = self._cursor.execute('SELECT name FROM default_category')
         result_list = ''
@@ -41,7 +33,6 @@ class DBManager:
 
         return result_list
 
-    @open_connection
     def try_add_user(self, user, creation_date):
         existing_user = self._cursor.execute('SELECT * FROM user WHERE telegram_id = :telegram_id',
                                          {'telegram_id' : user.id })
@@ -53,7 +44,6 @@ class DBManager:
                                'created_at': creation_date })
             self._con.commit()
 
-    @open_connection
     def try_start_session(self, user_id, start_date):
         existing_session = self._get_active_session_id_for_user(user_id)
 
@@ -77,7 +67,6 @@ class DBManager:
         else:
             return False
 
-    @open_connection
     def try_stop_session(self, user_id, stop_date):
         existing_session = self._get_active_session_id_for_user(user_id)
 
@@ -92,7 +81,6 @@ class DBManager:
         else:
             return False
 
-    @open_connection
     def try_stop_event(self, user_id, category, start_date):
         rowcount = self._cursor.execute(
             """UPDATE timesheet
@@ -115,7 +103,6 @@ class DBManager:
 
         return rowcount == 1;
 
-    @open_connection
     def start_event(self, user_id, start_date):
         res = self._cursor.execute(
             """INSERT INTO timesheet(uuid, session_id, start)
@@ -125,7 +112,6 @@ class DBManager:
              'uuid': str(uuid())})
         self._con.commit()
 
-    @open_connection
     def try_set_step(self, user_id, step):
         session_id = self._get_active_session_id_for_user(user_id).fetchone()
         if session_id is None:
@@ -143,7 +129,6 @@ class DBManager:
 
         return True
 
-    @open_connection
     def try_get_step(self, user_id):
         session_id = self._get_active_session_id_for_user(user_id).fetchone()
         if session_id is None:
