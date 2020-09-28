@@ -1,0 +1,34 @@
+CREATE TABLE IF NOT EXISTS user (
+    telegram_id integer,
+    name string,
+    last_name string,
+    created_at datetime
+);
+
+CREATE TABLE IF NOT EXISTS category (
+    id integer PRIMARY KEY AUTOINCREMENT,
+    user_telegram_id integer,
+    name varchar(255)
+);
+
+CREATE TABLE IF NOT EXISTS default_category (
+    id integer PRIMARY KEY AUTOINCREMENT,
+    name string UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS timesheet (
+    uuid varchar(255) PRIMARY KEY,
+    session_id integer,
+    user_category_id integer,
+    default_category_id integer,
+    start datetime,
+    finish datetime
+);
+
+CREATE TABLE IF NOT EXISTS session (
+    id integer PRIMARY KEY AUTOINCREMENT,
+    user_telegram_id integer,
+    time_interval integer,
+    session_start datetime,
+    session_stop datetime
+);

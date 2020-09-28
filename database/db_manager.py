@@ -1,7 +1,8 @@
 import sqlite3
+from pathlib import Path
 from uuid import uuid4 as uuid
 
-from . import sql
+from settings.config import DB_NAME, DB_MIGRATIONS_DIR
 
 
 class DBManager:
@@ -13,18 +14,22 @@ class DBManager:
             return result
         return wrapper
 
-    @open_connection
+    def __init__(self):
+        self._con = sqlite3.Connection(DB_NAME)
+        self._cursor = self._con.cursor()
+
+    def _get_migration_file_paths(self):
+        migrations_dir = Path(DB_MIGRATIONS_DIR)
+        migrations = sorted(migrations_dir.glob('*'))
+        return migrations
+
     def migrate(self):
-        self.create_tables(self.con)
-        self.populate_categories(self.con)
-
-    def create_tables(self, con):
-        for query in sql.CREATE_TABLES:
-            con.execute(query)
-
-    def populate_categories(self, con):
-        for query in sql.CATEGORY_INSERTS:
-            con.execute(query)
+        migration_paths = self._get_migration_file_paths()
+        for migration_path in migration_paths:
+            with migration_path.open('r', encoding='utf-8') as f:
+                sql = f.read()
+            self._cursor.executescript(sql)
+            self._con.commit()
 
     @open_connection
     def list_categories(self):
