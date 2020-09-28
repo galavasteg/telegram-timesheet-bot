@@ -28,6 +28,7 @@ class DBManager:
         categories = self._cursor.execute('SELECT name FROM default_category')
         result_list = ''
 
+        # TODO: representation not on this level
         for category in categories:
             result_list += 'Категория ' + str(category) + '\n'
 

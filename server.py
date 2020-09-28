@@ -175,6 +175,7 @@ async def all_other_messages(message: types.Message):
     elif message.text == 'Сменить интервал':
         await set_step_routine(message)
     elif message.text == 'Отчет':
+        # TODO: implement reports
         await message.answer('Отчета пока нет')
 
 
