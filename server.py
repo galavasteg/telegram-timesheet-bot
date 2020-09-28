@@ -10,10 +10,10 @@ from typing import Callable
 from aiogram import Bot, Dispatcher, executor
 from aiogram import types
 
+import settings
 import messages as msgs
 from database.db_manager import DBManager
 from middlewares import AccessMiddleware
-from settings import LOG, ACCESS_IDS, TELEGRAM_API_TOKEN, DEBUG_MODE
 
 
 # FIXME: wrong decoration of async funcs, use asyncref?
@@ -22,10 +22,11 @@ def log_errors(func: Callable) -> Callable:
         try:
             func(*args, **kwargs)
         except Exception as e:
-            LOG.error(e, exc_info=DEBUG_MODE)
+            LOG.error(e, exc_info=settings.DEBUG_MODE)
     return decorator
 
 
+LOG = settings.LOG
 
 db = DBManager()
 
@@ -35,7 +36,7 @@ dp.middleware.setup(AccessMiddleware(settings.ACCESS_IDS))
 
 stop_sending = asyncio.Event()
 lock = asyncio.Lock()
-interval = 15
+interval = settings.DEFAULT_INTERVAL_SECONDS
 
 
 async def get_interval(user_id):

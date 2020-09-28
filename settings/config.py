@@ -62,3 +62,6 @@ access_ids_file = Path(getenv('ACCESS_IDS_FILE',
 assert access_ids_file.exists(), f'No such file: {access_ids_file=}'
 with open(str(access_ids_file)) as f:
     ACCESS_IDS = set(json.load(f))
+
+
+DEFAULT_INTERVAL_SECONDS = 60 * 15

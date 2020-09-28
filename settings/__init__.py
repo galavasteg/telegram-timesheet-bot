@@ -4,4 +4,5 @@ from settings.config import (
     ACCESS_IDS,
     TELEGRAM_API_TOKEN,
     DEBUG_MODE,
+    DEFAULT_INTERVAL_SECONDS,
 )
