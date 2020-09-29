@@ -35,12 +35,14 @@ async def get_interval(user_id):
     finally:
         lock.release()
 
+
 async def set_interval(user_id, new_step):
     await lock.acquire()
     try:
         db.try_set_step(user_id, new_step)
     finally:
         lock.release()
+
 
 async def repeat(func, *args, **kwargs):
     """Run func every interval seconds.
@@ -60,12 +62,13 @@ async def repeat(func, *args, **kwargs):
                 asyncio.sleep(step),
         )
 
-@dp.message_handler(commands=('help'))
+
+@dp.message_handler(commands=('help',))
 async def send_welcome(message: types.Message):
     await message.answer(msgs.welcome)
 
 
-@dp.message_handler(commands=('start'))
+@dp.message_handler(commands=('start',))
 async def send_start(message: types.Message):
     if message.get_command(pure=True) == 'start':
         LOG.info('User: ' + message.from_user.get_mention())
@@ -87,7 +90,7 @@ async def start_routine(message: types.Message):
         await repeat(periodic, user.id)
 
 
-@dp.message_handler(commands=('stop'))
+@dp.message_handler(commands=('stop',))
 async def send_stop(message: types.Message):
     await stop_routine(message)
 
@@ -107,15 +110,15 @@ async def stop_routine(message: types.Message):
     if stopped == True:
         stop_sending.set()
 
-@dp.message_handler(commands=('list'))
+
+@dp.message_handler(commands=('list',))
 async def send_list(message: types.Message):
-    """Send "welcome" and info about bot usage to user"""
     msg = db.list_categories()
     await message.answer(msg)
 
-@dp.message_handler(commands=('buttons'))
-async def send_list(message: types.Message):
 
+@dp.message_handler(commands=('buttons',))
+async def send_list(message: types.Message):
     btn_start = types.KeyboardButton('Старт')
     btn_stop = types.KeyboardButton('Стоп')
     btn_change_step = types.KeyboardButton('Сменить интервал')
@@ -127,8 +130,7 @@ async def send_list(message: types.Message):
     await message.reply("Отображаем кнопки", reply_markup=navigation_kb)
 
 
-
-@dp.message_handler(commands=('step'))
+@dp.message_handler(commands=('step',))
 async def send_set_step(message: types.Message):
     await set_step_routine(message)
 
@@ -167,7 +169,7 @@ async def all_other_messages(message: types.Message):
 async def periodic(*args):
     date_now = datetime.now()
     date = str(date_now.strftime("%Y-%m-%d %H:%M:%S"))
-    data = {'name':'','date':date}
+    data = {'name': '', 'date': date}
 
     data['name'] = 'Работа'
     work_btn = types.InlineKeyboardButton('Работа', callback_data=json.dumps(data, ensure_ascii=False))
@@ -199,6 +201,7 @@ async def periodic(*args):
         await bot.send_message(user_id, f'{date_now.strftime("%m-%d %H:%M:%S")}. Что делал последние: {step} секунд', reply_markup=buttons)
     else:
         await bot.send_message(user_id, 'Ошибка получения интервала')
+
 
 @dp.callback_query_handler(lambda c: 'name' in c.data and 'date' in c.data)
 async def process_callback_button1(callback_query: types.CallbackQuery):
