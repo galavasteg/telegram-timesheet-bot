@@ -144,6 +144,6 @@ class DBManager:
         return True, step
 
     def _get_active_session_id_for_user(self, user_id):
-        query = f'SELECT id FROM session' \
-                f'WHERE user_telegram_id = {user_id} AND session_stop is NULL'
+        query = f"""SELECT id FROM session
+                WHERE user_telegram_id = {user_id} AND session_stop is NULL"""
         return self._cursor.execute(query)
