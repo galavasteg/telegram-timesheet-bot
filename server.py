@@ -70,8 +70,8 @@ async def send_welcome(message: types.Message):
 
 @dp.message_handler(commands=('start',))
 async def send_start(message: types.Message):
-    if message.get_command(pure=True) == 'start':
-        LOG.info('User: ' + message.from_user.get_mention())
+    msg = 'Opened session. User: ' + message.from_user.get_mention()
+    LOG.info(msg)
     await start_routine(message)
 
 
@@ -93,6 +93,8 @@ async def start_routine(message: types.Message):
 @dp.message_handler(commands=('stop',))
 async def send_stop(message: types.Message):
     await stop_routine(message)
+    msg = 'Closed session. User: ' + message.from_user.get_mention()
+    LOG.info(msg)
 
 
 async def stop_routine(message: types.Message):
@@ -100,14 +102,11 @@ async def stop_routine(message: types.Message):
     now = datetime.now()
 
     stopped = db.try_stop_session(user.id, now)
-
-    reply = 'Остановились'
-    if stopped == False:
-        reply = 'Нечего останавливать'
+    reply = 'Остановились' if stopped else 'Нечего останавливать'
 
     await message.answer(reply)
 
-    if stopped == True:
+    if stopped:
         stop_sending.set()
 
 
