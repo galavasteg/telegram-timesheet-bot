@@ -75,7 +75,7 @@ async def send_start(message: types.Message):
 async def start_routine(message: types.Message):
     user = message.from_user
     now = datetime.now()
-    db.try_add_user(user, now)
+    db.try_register_user(user)
 
     started = db.try_start_session(user.id, now)
 

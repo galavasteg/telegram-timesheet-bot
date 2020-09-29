@@ -1,4 +1,5 @@
 import sqlite3
+from datetime import datetime
 from pathlib import Path
 from uuid import uuid4 as uuid
 
@@ -34,16 +35,18 @@ class DBManager:
 
         return result_list
 
-    def try_add_user(self, user, creation_date):
-        existing_user = self._cursor.execute('SELECT * FROM user WHERE telegram_id = :telegram_id',
-                                         {'telegram_id' : user.id })
-        if existing_user.fetchone() is None:
-            self._cursor.execute('INSERT INTO user(telegram_id, name, last_name, created_at) VALUES (:telegram_id, :name, :last_name, :created_at)',
-                             { 'telegram_id' : user.id,
-                               'name': user.first_name,
-                               'last_name': user.last_name,
-                               'created_at': creation_date })
-            self._con.commit()
+    def try_register_user(self, user):
+        query = f'SELECT * FROM user WHERE telegram_id = {user.id}'
+        db_user = self._cursor.execute(query).fetchone()
+
+        if not db_user:
+            self.register_user(user)
+
+    def register_user(self, user):
+        quary = f'INSERT INTO user(telegram_id, name, last_name, created_at)' \
+                f'VALUES ({user.id}, {user.first_name}, {user.last_name}, {datetime.now()})'
+        self._cursor.execute(quary)
+        self._con.commit()
 
     def try_start_session(self, user_id, start_date):
         existing_session = self._get_active_session_id_for_user(user_id)
