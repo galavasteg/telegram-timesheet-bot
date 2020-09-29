@@ -120,12 +120,10 @@ class DBManager:
 
         session_id = session_id[0]
 
-        res = self._cursor.execute(
-            """UPDATE session
-                set time_interval = :step
-                where id = :session_id""",
-            {'session_id': session_id,
-             'step': step})
+        query = f"""UPDATE session
+                SET time_interval = {step}
+                WHERE id = {session_id}"""
+        res = self._cursor.execute(query)
         self._con.commit()
 
         return True
@@ -146,5 +144,6 @@ class DBManager:
         return True, step
 
     def _get_active_session_id_for_user(self, user_id):
-        return self._cursor.execute('SELECT id FROM session WHERE user_telegram_id = :user_telegram_id AND session_stop is NULL',
-                                         {'user_telegram_id': user_id})
+        query = f'SELECT id FROM session' \
+                f'WHERE user_telegram_id = {user_id} AND session_stop is NULL'
+        return self._cursor.execute(query)

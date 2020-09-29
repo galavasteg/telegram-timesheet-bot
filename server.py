@@ -152,17 +152,25 @@ async def set_step_routine(message: types.Message):
                            reply_markup=buttons)
 
 
+BTNNAME_HANDLER_MAP = {
+    'Старт': start_routine,
+    'Стоп': stop_routine,
+    'Сменить интервал': set_step_routine,
+    # TODO: implement reports
+    # 'Отчет': start_routine,
+}
+
+
 @dp.message_handler(content_types=types.ContentTypes.ANY)
-async def all_other_messages(message: types.Message):
-    if message.text == 'Старт':
-        await start_routine(message)
-    elif message.text == 'Стоп':
-        await stop_routine(message)
-    elif message.text == 'Сменить интервал':
-        await set_step_routine(message)
-    elif message.text == 'Отчет':
-        # TODO: implement reports
-        await message.answer('Отчета пока нет')
+async def reply_admin_btns(message: types.Message):
+    btn_name = message.text
+
+    if btn_name not in BTNNAME_HANDLER_MAP:
+        await message.answer(f'`{btn_name}` не реализован')
+    else:
+
+        handler = BTNNAME_HANDLER_MAP[btn_name]
+        await handler(message)
 
 
 async def periodic(*args):
@@ -205,15 +213,16 @@ async def periodic(*args):
 @dp.callback_query_handler(lambda c: 'name' in c.data and 'date' in c.data)
 async def process_callback_button1(callback_query: types.CallbackQuery):
     await bot.answer_callback_query(callback_query.id)
-
     data = json.loads(callback_query.data)
-    stopped = db.try_stop_event(callback_query.from_user.id, data['name'], data['date'])
+    user_id = callback_query.from_user.id
 
-    reply = data['date'] + ' - Заполнено. ' + data['name']
-    if not stopped:
+    stopped = db.try_stop_event(user_id, data['name'], data['date'])
+    if stopped:
+        reply = f'{data["date"]} - Заполнено. {data["name"]}'
+    else:
         reply = 'Промежуток уже был заполнен'
 
-    await bot.send_message(callback_query.from_user.id, reply)
+    await bot.send_message(user_id, reply)
 
 
 @dp.callback_query_handler(lambda c: 'step' in c.data)
