@@ -5,7 +5,6 @@
 import json
 import asyncio
 from datetime import datetime
-from typing import Callable
 
 from aiogram import Bot, Dispatcher, executor
 from aiogram import types
@@ -14,16 +13,6 @@ import settings
 import messages as msgs
 from database.db_manager import DBManager
 from middlewares import AccessMiddleware
-
-
-# FIXME: wrong decoration of async funcs, use asyncref?
-def log_errors(func: Callable) -> Callable:
-    def decorator(*args, **kwargs):
-        try:
-            func(*args, **kwargs)
-        except Exception as e:
-            LOG.error(e, exc_info=settings.DEBUG_MODE)
-    return decorator
 
 
 LOG = settings.LOG
@@ -71,13 +60,11 @@ async def repeat(func, *args, **kwargs):
                 asyncio.sleep(step),
         )
 
-@log_errors
 @dp.message_handler(commands=('help'))
 async def send_welcome(message: types.Message):
     await message.answer(msgs.welcome)
 
 
-@log_errors
 @dp.message_handler(commands=('start'))
 async def send_start(message: types.Message):
     if message.get_command(pure=True) == 'start':
@@ -120,14 +107,12 @@ async def stop_routine(message: types.Message):
     if stopped == True:
         stop_sending.set()
 
-@log_errors
 @dp.message_handler(commands=('list'))
 async def send_list(message: types.Message):
     """Send "welcome" and info about bot usage to user"""
     msg = db.list_categories()
     await message.answer(msg)
 
-@log_errors
 @dp.message_handler(commands=('buttons'))
 async def send_list(message: types.Message):
 
@@ -143,7 +128,6 @@ async def send_list(message: types.Message):
 
 
 
-@log_errors
 @dp.message_handler(commands=('step'))
 async def send_set_step(message: types.Message):
     await set_step_routine(message)
