@@ -86,34 +86,31 @@ class DBManager:
             return False
 
     def try_stop_event(self, user_id, category, start_date):
-        rowcount = self._cursor.execute(
-            """UPDATE timesheet
-               SET finish = datetime(strftime('%s', start) + 
-                                    (select time_interval from session where session_id = id),  'unixepoch'),
-                   default_category_id = (select id from category 
-                                            where user_telegram_id = :user_telegram_id and name = :category),
-                   user_category_id = (select id from default_category where name = :category)
-               WHERE uuid IN 
-                   (SELECT uuid 
-                   FROM timesheet tm
-                   JOIN session s on tm.session_id = s.id
-                   WHERE s.user_telegram_id = :user_telegram_id 
-                    AND tm.start = :start_date
-                    AND tm.finish is NULL)""",
-            {'user_telegram_id': user_id,
-             'start_date': start_date,
-             'category': category}).rowcount
+        query = f"""
+            UPDATE timesheet
+            SET finish = datetime(strftime('%s', start) + 
+                                  (select time_interval from session where session_id = id),
+                                  'unixepoch'),
+                default_category_id = (select id from category 
+                                       where user_telegram_id = {user_id} and name = '{category}'),
+                user_category_id = (select id from default_category where name = '{category}')
+            WHERE uuid IN (SELECT uuid 
+                           FROM timesheet tm
+                            JOIN session s on tm.session_id = s.id
+                           WHERE s.user_telegram_id = {user_id}
+                            AND tm.start = '{start_date}'
+                            AND tm.finish is NULL)"""
+        stopped_event = self._cursor.execute(query)
         self._con.commit()
 
-        return rowcount == 1
+        stopped = stopped_event.rowcount == 1
+        return stopped
 
     def start_event(self, user_id, start_date):
-        res = self._cursor.execute(
-            """INSERT INTO timesheet(uuid, session_id, start)
-                VALUES  (:uuid, :session_id, :start_date)""",
-            {'session_id': self._get_active_session_id_for_user(user_id).fetchone()[0],
-             'start_date': start_date,
-             'uuid': str(uuid())})
+        session_id = self._get_active_session_id_for_user(user_id).fetchone()[0]
+        query = f"""INSERT INTO timesheet(uuid, session_id, start)
+                VALUES  ('{str(uuid())}', {session_id}, '{start_date}')"""
+        _ = self._cursor.execute(query)
         self._con.commit()
 
     def try_set_step(self, user_id, step):
