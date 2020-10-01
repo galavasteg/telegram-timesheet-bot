@@ -9,6 +9,11 @@ from pypika import Table, Query
 from settings.config import DB_NAME, DB_MIGRATIONS_DIR
 
 
+USER = Table('user')
+# TODO: category vs default_category, do we really need both?
+CATEGORY = Table('default_category')
+
+
 class DBManager:
 
     def __init__(self):
@@ -35,9 +40,7 @@ class DBManager:
     def list_categories(self, user_id=None) -> tuple:
         """Get categories for current user"""
         # TODO: user categories
-        # TODO: category vs default_category, do we really need both?
-        category = Table('default_category')
-        query = Query.from_(category).select('*')
+        query = Query.from_(CATEGORY).select('*')
 
         categories = self._cursor.execute(query.get_sql())
 
@@ -52,9 +55,8 @@ class DBManager:
             self.register_user(user)
 
     def register_user(self, u: types.User):
-        user = Table('user')
         values = u.id, u.first_name, u.last_name, str(datetime.now())
-        query = Query.into(user).insert(*values)
+        query = Query.into(USER).insert(*values)
 
         self._cursor.execute(query.get_sql())
         self._con.commit()
