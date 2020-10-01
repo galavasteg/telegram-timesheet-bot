@@ -11,6 +11,7 @@ from aiogram import types
 
 import settings
 import messages as msgs
+import settings.constancies as const
 from database.db_manager import DBManager
 from middlewares import AccessMiddleware
 
@@ -26,17 +27,6 @@ dp.middleware.setup(AccessMiddleware(settings.ACCESS_IDS))
 stop_sending = asyncio.Event()
 lock = asyncio.Lock()
 
-CHOOSE_INTERVAL_TEXT = 'Выбери интервал'
-INTERVAL_BUTTONS = (
-    types.InlineKeyboardButton('15 минут', callback_data=str(60 * 15)),
-    types.InlineKeyboardButton('20 минут', callback_data=str(60 * 20)),
-    types.InlineKeyboardButton('30 минут', callback_data=str(60 * 30)),
-)
-DEBUG_BUTTONS = (
-    types.InlineKeyboardButton('5 секунд (тест)', callback_data=str(5)),
-    types.InlineKeyboardButton('10 секунд (тест)', callback_data=str(10)),
-    types.InlineKeyboardButton('30 секунд (тест)', callback_data=str(30)),
-)
 
 async def get_interval(user_id):
     await lock.acquire()
@@ -147,12 +137,12 @@ async def send_set_step(message: types.Message):
 
 
 async def set_step_routine(message: types.Message):
-    buttons = types.InlineKeyboardMarkup().row(*INTERVAL_BUTTONS)
+    buttons = types.InlineKeyboardMarkup().row(*const.INTERVAL_BUTTONS)
     if settings.DEBUG_MODE:
-        buttons.row(*DEBUG_BUTTONS)
+        buttons.row(*const.DEBUG_BUTTONS)
 
     await bot.send_message(message.from_user.id,
-                           CHOOSE_INTERVAL_TEXT,
+                           const.CHOOSE_INTERVAL_TEXT,
                            reply_markup=buttons)
 
 
