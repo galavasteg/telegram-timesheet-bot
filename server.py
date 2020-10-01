@@ -131,10 +131,10 @@ async def send_list(message: types.Message):
     btn_start = types.KeyboardButton('Старт')
     btn_stop = types.KeyboardButton('Стоп')
     btn_change_step = types.KeyboardButton('Сменить интервал')
-    btn_report = types.KeyboardButton('Отчет')
+    btn_statistic = types.KeyboardButton('Отчет')
 
     navigation_kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    navigation_kb.row(btn_start, btn_stop).row(btn_change_step, btn_report)
+    navigation_kb.row(btn_start, btn_stop).row(btn_change_step, btn_statistic)
 
     await message.reply("Отображаем кнопки", reply_markup=navigation_kb)
 
@@ -159,7 +159,7 @@ BTNNAME_HANDLER_MAP = {
     'Стоп': stop_routine,
     'Сменить интервал': set_step_routine,
     # TODO: implement reports
-    # 'Отчет': start_routine,
+    # 'Статистика >>': start_routine,
 }
 
 
