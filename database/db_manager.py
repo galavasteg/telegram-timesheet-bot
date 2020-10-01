@@ -12,6 +12,10 @@ class DBManager:
         self._con = sqlite3.Connection(DB_NAME)
         self._cursor = self._con.cursor()
 
+    def __del__(self):
+        self._cursor.close()
+        self._con.close()
+
     def _get_migration_file_paths(self):
         migrations_dir = Path(DB_MIGRATIONS_DIR)
         migrations = sorted(migrations_dir.glob('*'))
@@ -36,6 +40,7 @@ class DBManager:
         return result_list
 
     def try_register_user(self, user):
+        # TODO: set settings.DEFAULT_INTERVAL_SECONDS
         query = f'SELECT * FROM user WHERE telegram_id = {user.id}'
         db_user = self._cursor.execute(query).fetchone()
 
