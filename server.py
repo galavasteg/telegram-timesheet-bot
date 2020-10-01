@@ -25,8 +25,18 @@ dp.middleware.setup(AccessMiddleware(settings.ACCESS_IDS))
 
 stop_sending = asyncio.Event()
 lock = asyncio.Lock()
-interval = settings.DEFAULT_INTERVAL_SECONDS
 
+CHOOSE_INTERVAL_TEXT = 'Выбери интервал'
+INTERVAL_BUTTONS = (
+    types.InlineKeyboardButton('15 минут', callback_data=str(60 * 15)),
+    types.InlineKeyboardButton('20 минут', callback_data=str(60 * 20)),
+    types.InlineKeyboardButton('30 минут', callback_data=str(60 * 30)),
+)
+DEBUG_BUTTONS = (
+    types.InlineKeyboardButton('5 секунд (тест)', callback_data=str(5)),
+    types.InlineKeyboardButton('10 секунд (тест)', callback_data=str(10)),
+    types.InlineKeyboardButton('30 секунд (тест)', callback_data=str(30)),
+)
 
 async def get_interval(user_id):
     await lock.acquire()
@@ -135,20 +145,12 @@ async def send_set_step(message: types.Message):
 
 
 async def set_step_routine(message: types.Message):
-    btn_10_minutes = types.InlineKeyboardButton('15 минут', callback_data='step_15')
-    btn_20_minutes = types.InlineKeyboardButton('20 минут', callback_data='step_20')
-    btn_30_minutes = types.InlineKeyboardButton('30 минут', callback_data='step_30')
-
-    btn_5_second = types.InlineKeyboardButton('5 секунд (тест)', callback_data='step_5_s')
-    btn_10_seconds = types.InlineKeyboardButton('10 секунд (тест)', callback_data='step_10_s')
-    btn_30_seconds = types.InlineKeyboardButton('30 секунд (тест)', callback_data='step_30_s')
-
-    buttons = types.InlineKeyboardMarkup() \
-        .row(btn_10_minutes, btn_20_minutes, btn_30_minutes) \
-        .row(btn_5_second, btn_10_seconds, btn_30_seconds)
+    buttons = types.InlineKeyboardMarkup().row(*INTERVAL_BUTTONS)
+    if settings.DEBUG_MODE:
+        buttons.row(*DEBUG_BUTTONS)
 
     await bot.send_message(message.from_user.id,
-                           'Выбери интервал',
+                           CHOOSE_INTERVAL_TEXT,
                            reply_markup=buttons)
 
 
@@ -225,50 +227,19 @@ async def process_callback_button1(callback_query: types.CallbackQuery):
     await bot.send_message(user_id, reply)
 
 
-@dp.callback_query_handler(lambda c: 'step' in c.data)
+@dp.callback_query_handler(lambda c: c.message.text == CHOOSE_INTERVAL_TEXT)
 async def process_callback_button1(callback_query: types.CallbackQuery):
     await bot.answer_callback_query(callback_query.id)
+    interval_seconds = int(callback_query.data)
+    # TODO: seconds to minutes (via datetime?)
+    interval_representation = f'{interval_seconds} секунд'
 
-    cmd = callback_query.data
-    error_msg = 'Нет активной сессии, в которой можно сменить интервал'
-    reply = 'Интервал установлен в '
+    is_set = db.try_set_step(callback_query.from_user.id, interval_seconds)
 
-    if cmd == 'step_15':
-        result = db.try_set_step(callback_query.from_user.id, 15 * 60)
-        if result == True:
-            reply += '15 минут'
-        else:
-            reply = error_msg
-    elif cmd == 'step_20':
-        result = db.try_set_step(callback_query.from_user.id, 20 * 60)
-        if result == True:
-            reply += '20 минут'
-        else:
-            reply = error_msg
-    elif cmd == 'step_30':
-        result = db.try_set_step(callback_query.from_user.id, 30 * 60)
-        if result == True:
-            reply += '30 минут'
-        else:
-            reply = error_msg
-    elif cmd == 'step_5_s':
-        result = db.try_set_step(callback_query.from_user.id, 5)
-        if result == True:
-            reply += '5 секунд'
-        else:
-            reply = error_msg
-    elif cmd == 'step_10_s':
-        result = db.try_set_step(callback_query.from_user.id, 10)
-        if result == True:
-            reply += '10 секунд'
-        else:
-            reply = error_msg
-    elif cmd == 'step_30_s':
-        result = db.try_set_step(callback_query.from_user.id, 30)
-        if result == True:
-            reply += '30 секунд'
-        else:
-            reply = error_msg
+    if is_set:
+        reply = 'Интервал изменен: {}'.format(interval_representation)
+    else:
+        reply = 'Интервал тот же: {}'.format(interval_representation)
     await bot.send_message(callback_query.from_user.id, reply)
 
 
