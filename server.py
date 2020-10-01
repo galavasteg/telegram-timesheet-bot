@@ -122,7 +122,9 @@ async def stop_routine(message: types.Message):
 
 @dp.message_handler(commands=('list',))
 async def send_list(message: types.Message):
-    msg = db.list_categories()
+    categories = db.list_categories()
+    msg = 'Категории:\n\n{}'.format(
+            '\n'.join(name for _, name in categories))
     await message.answer(msg)
 
 

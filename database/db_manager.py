@@ -3,6 +3,8 @@ from datetime import datetime
 from pathlib import Path
 from uuid import uuid4 as uuid
 
+from pypika import Table, Query
+
 from settings.config import DB_NAME, DB_MIGRATIONS_DIR
 
 
@@ -29,15 +31,16 @@ class DBManager:
             self._cursor.executescript(sql)
             self._con.commit()
 
-    def list_categories(self):
-        categories = self._cursor.execute('SELECT name FROM default_category')
-        result_list = ''
+    def list_categories(self, user_id=None) -> tuple:
+        """Get categories for current user"""
+        # TODO: user categories
+        # TODO: category vs default_category, do we really need both?
+        category = Table('default_category')
+        query = Query.from_(category).select('*')
 
-        # TODO: representation not on this level
-        for category in categories:
-            result_list += 'Категория ' + str(category) + '\n'
+        categories = self._cursor.execute(query.get_sql())
 
-        return result_list
+        return tuple(categories)
 
     def try_register_user(self, user):
         # TODO: set settings.DEFAULT_INTERVAL_SECONDS
