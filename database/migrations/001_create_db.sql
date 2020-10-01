@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS user (
-    telegram_id integer,
+    telegram_id integer PRIMARY KEY,
     name string,
     last_name string,
     created_at datetime

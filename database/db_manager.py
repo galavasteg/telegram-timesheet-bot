@@ -3,6 +3,7 @@ from datetime import datetime
 from pathlib import Path
 from uuid import uuid4 as uuid
 
+from aiogram import types
 from pypika import Table, Query
 
 from settings.config import DB_NAME, DB_MIGRATIONS_DIR
@@ -50,10 +51,12 @@ class DBManager:
         if not db_user:
             self.register_user(user)
 
-    def register_user(self, user):
-        quary = f"INSERT INTO user(telegram_id, name, last_name, created_at)" \
-                f"VALUES ({user.id}, '{user.first_name}', '{user.last_name}', '{datetime.now()}')"
-        self._cursor.execute(quary)
+    def register_user(self, u: types.User):
+        user = Table('user')
+        values = u.id, u.first_name, u.last_name, str(datetime.now())
+        query = Query.into(user).insert(*values)
+
+        self._cursor.execute(query.get_sql())
         self._con.commit()
 
     def try_start_session(self, user_id, start_date):
