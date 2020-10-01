@@ -11,3 +11,4 @@ multidict==4.7.3
 pytz==2019.3
 yarl==1.4.2
 pyTelegramBotAPI==3.7.3
+pypika
