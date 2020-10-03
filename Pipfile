@@ -7,7 +7,7 @@ verify_ssl = true
 python-dotenv = "*"
 
 [packages]
-aiogram = "==2.4"
+aiogram = "==2.10.1"
 aiohttp = "==3.6.2"
 async-timeout = "==3.0.1"
 attrs = "==19.3.0"
@@ -19,6 +19,7 @@ pytz = "==2019.3"
 yarl = "==1.4.2"
 Babel = "==2.7.0"
 pypika = "*"
+more-itertools = "*"
 
 [requires]
 python_version = "3.8"
