@@ -1,23 +1,33 @@
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Tuple
 from uuid import uuid4 as uuid
 
 from aiogram import types
-from pypika import Table, Query
-
-from settings.config import DB_NAME, DB_MIGRATIONS_DIR
+from pypika import Table, SQLLiteQuery, Parameter
+# SQLLiteQuery = SQLLiteQuery
+from settings.config import DB_NAME, DB_MIGRATIONS_DIR, DEBUG_MODE
+from settings.constancies import DEFAULT_INTERVAL_SECONDS
 
 
 USER = Table('user')
 # TODO: category vs default_category, do we really need both?
 CATEGORY = Table('default_category')
+SESSION = Table('session')
+TIMESHEET = Table('timesheet')
+
+
+class DoesNotExist(Exception):
+    """Exception for empty DB-response."""
 
 
 class DBManager:
 
     def __init__(self):
         self._con = sqlite3.Connection(DB_NAME)
+        if DEBUG_MODE:
+            self._con.set_trace_callback(print)
         self._cursor = self._con.cursor()
 
     def __del__(self):
@@ -37,126 +47,156 @@ class DBManager:
             self._cursor.executescript(sql)
             self._con.commit()
 
-    def list_categories(self, user_id=None) -> tuple:
+    def get_category(self, category_id: int) -> tuple:
+        query = SQLLiteQuery.from_(CATEGORY).select('*') \
+            .where(CATEGORY.id == Parameter(':category_id'))
+
+        category = self._cursor.execute(
+            query.get_sql(), {'category_id': category_id}).fetchone()
+
+        if not category:
+            raise DoesNotExist()
+
+        return category
+
+    def list_categories(self, u: types.User) -> tuple:
         """Get categories for current user"""
         # TODO: user categories
-        query = Query.from_(CATEGORY).select('*')
+        query = SQLLiteQuery.from_(CATEGORY).select('*')
 
         categories = self._cursor.execute(query.get_sql())
 
         return tuple(categories)
 
-    def try_register_user(self, user):
-        # TODO: set settings.DEFAULT_INTERVAL_SECONDS
-        query = f'SELECT * FROM user WHERE telegram_id = {user.id}'
-        db_user = self._cursor.execute(query).fetchone()
+    def get_user(self, u: types.User) -> tuple:
+        query = SQLLiteQuery.from_(USER).select('*').where(
+            USER.telegram_id.eq(u.id))
 
+        db_user = self._cursor.execute(query.get_sql()).fetchone()
         if not db_user:
-            self.register_user(user)
+            raise DoesNotExist(query.get_sql())
+
+        return db_user
+
+    def register_user_if_not_exists(self, u: types.User):
+        try:
+            _ = self.get_user(u)
+        except DoesNotExist:
+            self.register_user(u)
 
     def register_user(self, u: types.User):
-        values = u.id, u.first_name, u.last_name, str(datetime.now())
-        query = Query.into(USER).insert(*values)
+        columns = 'telegram_id', 'interval_seconds', 'first_name', 'last_name', 'created_at'
+        values = u.id, DEFAULT_INTERVAL_SECONDS, u.first_name, u.last_name, str(datetime.now())
+        column_value_map = dict(zip(columns, values))
+        params = map(lambda col: f':{col}', columns)
+        query = SQLLiteQuery.into(USER).columns(*columns).insert(
+            *map(Parameter, params))
 
-        self._cursor.execute(query.get_sql())
+        _ = self._cursor.execute(query.get_sql(), column_value_map)
         self._con.commit()
 
-    def try_start_session(self, user_id, start_date):
-        existing_session = self._get_active_session_id_for_user(user_id)
+    def create_session(self, u: types.User):
+        columns = 'user_telegram_id', 'start_at'
+        values = u.id, str(datetime.now())
+        column_value_map = dict(zip(columns, values))
+        params = map(lambda col: f':{col}', columns)
+        query = SQLLiteQuery.into(SESSION).columns(*columns).insert(
+            *map(Parameter, params))
 
-        if existing_session.fetchone() == None:
+        _ = self._cursor.execute(query.get_sql(), column_value_map)
+        self._con.commit()
 
-            default_interval = 20 * 60
-            previous_interval = self._cursor.execute('SELECT time_interval FROM session WHERE id = (SELECT MAX(id) from session WHERE user_telegram_id = :user_telegram_id)',
-                                                 {'user_telegram_id': user_id}).fetchone()
-            if previous_interval is None:
-                previous_interval = default_interval
-            else:
-                previous_interval = previous_interval[0]
+        created_session_id = self._cursor.lastrowid
+        return created_session_id
 
-            self._cursor.execute(
-                'INSERT INTO session(user_telegram_id, time_interval, session_start) VALUES (:user_telegram_id, :time_interval, :session_start)',
-                {'user_telegram_id': user_id,
-                 'time_interval': previous_interval,
-                 'session_start': start_date})
+    def get_new_or_existing_session_id(self, u: types.User) -> Tuple[int, bool]:
+        try:
+            existing_session = self._get_active_session(u)
+        except DoesNotExist:
+            new_session_id = self.create_session(u)
+            return new_session_id, True
+        else:
+            return existing_session[0], False
+
+    def try_stop_session(self, u: types.User):
+        try:
+            opened_session = self._get_active_session(u)
+        except DoesNotExist:
+            return False
+        else:
+            session_id, *_ = opened_session
+            query = SQLLiteQuery.update(SESSION) \
+                .set(SESSION.stop_at, datetime.now()) \
+                .where(SESSION.id.eq(session_id))
+            self._cursor.execute(query.get_sql())
             self._con.commit()
             return True
-        else:
-            return False
 
-    def try_stop_session(self, user_id, stop_date):
-        existing_session = self._get_active_session_id_for_user(user_id)
+    def get_unstopped_activity(self, activity_id: str) -> tuple:
+        column_value_map = {'activity_id': activity_id}
+        query = SQLLiteQuery.from_(TIMESHEET).select('*').where(
+            (TIMESHEET.activity_id == Parameter(':activity_id')) &
+            (TIMESHEET.default_category_id.isnull()) &
+            (TIMESHEET.user_category_id.isnull())
+        )
 
-        fetched = existing_session.fetchone()
-        if fetched is not None:
-            self._cursor.execute(
-                'UPDATE session SET session_stop = :session_stop where id = :id',
-                {'session_stop': stop_date,
-                 'id': fetched[0]})
-            self._con.commit()
-            return True
-        else:
-            return False
+        activity = self._cursor.execute(query.get_sql(), column_value_map).fetchone()
+        if not activity:
+            raise DoesNotExist()
 
-    def try_stop_event(self, user_id, category, start_date):
-        query = f"""
-            UPDATE timesheet
-            SET finish = datetime(strftime('%s', start) + 
-                                  (select time_interval from session where session_id = id),
-                                  'unixepoch'),
-                default_category_id = (select id from category 
-                                       where user_telegram_id = {user_id} and name = '{category}'),
-                user_category_id = (select id from default_category where name = '{category}')
-            WHERE uuid IN (SELECT uuid 
-                           FROM timesheet tm
-                            JOIN session s on tm.session_id = s.id
-                           WHERE s.user_telegram_id = {user_id}
-                            AND tm.start = '{start_date}'
-                            AND tm.finish is NULL)"""
-        stopped_event = self._cursor.execute(query)
+        return activity
+
+    def stop_activity(self, activity_id: str, category_id: int):
+        _ = self.get_unstopped_activity(activity_id)  # check existing
+
+        column_value_map = {'activity_id': activity_id}
+        query = SQLLiteQuery.update(TIMESHEET).set(TIMESHEET.default_category_id, category_id).where(
+            TIMESHEET.activity_id == Parameter(':activity_id'))
+
+        self._cursor.execute(query.get_sql(), column_value_map)
         self._con.commit()
 
-        stopped = stopped_event.rowcount == 1
-        return stopped
+        if self._cursor.rowcount > 1:
+            raise RuntimeError()
 
-    def start_event(self, user_id, start_date):
-        session_id = self._get_active_session_id_for_user(user_id).fetchone()[0]
-        query = f"""INSERT INTO timesheet(uuid, session_id, start)
-                VALUES  ('{str(uuid())}', {session_id}, '{start_date}')"""
-        _ = self._cursor.execute(query)
+    def start_activity(self, session_id: int, interval_seconds: int) -> str:
+        columns = 'activity_id', 'session_id', 'start', 'finish'
+        finish = datetime.now()
+        start = finish - timedelta(0, interval_seconds)
+        values = str(uuid()), session_id, str(start), str(finish)
+        column_value_map = dict(zip(columns, values))
+        params = map(lambda col: f':{col}', columns)
+        query = SQLLiteQuery.into(TIMESHEET).columns(*columns).insert(
+            *map(Parameter, params))
+
+        _ = self._cursor.execute(query.get_sql(), column_value_map)
         self._con.commit()
 
-    def try_set_step(self, user_id, step):
-        session_id = self._get_active_session_id_for_user(user_id).fetchone()
-        if session_id is None:
-            return False
+        return column_value_map['activity_id']
 
-        session_id = session_id[0]
+    def set_interval_seconds(self, u: types.User, interval_seconds: int):
+        query = SQLLiteQuery.update(USER) \
+            .set(USER.interval_seconds, interval_seconds) \
+            .where(USER.telegram_id.eq(u.id))
 
-        query = f"""UPDATE session
-                SET time_interval = {step}
-                WHERE id = {session_id}"""
-        res = self._cursor.execute(query)
+        _ = self._cursor.execute(query.get_sql())
         self._con.commit()
 
-        return True
+        return self._cursor.rowcount
 
-    def try_get_step(self, user_id):
-        session_id = self._get_active_session_id_for_user(user_id).fetchone()
-        if session_id is None:
-            return False, None
+    def get_interval_seconds(self, u: types.User) -> int:
+        db_user = self.get_user(u)
+        # TODO dataclass?
+        interval = db_user[1]
+        return interval
 
-        session_id = session_id[0]
+    def _get_active_session(self, u: types.User) -> tuple:
+        query = SQLLiteQuery.from_(SESSION).select(SESSION.id) \
+            .where(SESSION.user_telegram_id.eq(u.id)) \
+            .where(SESSION.stop_at.isnull())
 
-        step = self._cursor.execute(
-            """SELECT time_interval
-                FROM session
-                WHERE id = :session_id""",
-            {'session_id': session_id}).fetchone()[0]
+        session = self._cursor.execute(query.get_sql()).fetchone()
+        if not session:
+            raise DoesNotExist(query.get_sql())
 
-        return True, step
-
-    def _get_active_session_id_for_user(self, user_id):
-        query = f"""SELECT id FROM session
-                WHERE user_telegram_id = {user_id} AND session_stop is NULL"""
-        return self._cursor.execute(query)
+        return session
