@@ -26,6 +26,7 @@ bot = Bot(token=settings.TELEGRAM_API_TOKEN)
 dp = Dispatcher(bot)
 dp.middleware.setup(AccessMiddleware(settings.ACCESS_IDS))
 
+# TODO: event for different user
 stop_sending = asyncio.Event()
 lock = asyncio.Lock()
 
@@ -47,6 +48,7 @@ async def set_interval(u: types.User, interval_seconds):
         lock.release()
 
 
+# TODO: message actualize
 @dp.message_handler(commands=('help',))
 async def send_welcome(message: types.Message):
     await message.answer(msgs.welcome)
@@ -60,12 +62,14 @@ async def start_session(message: types.Message):
     session_id, is_new_session = db.get_new_or_existing_session_id(user)
 
     if not is_new_session:
+        # TODO: all message tmpls to constants
         await message.answer('Обнаружена незавершенная сессия.'
                              ' Закройте ее ("Стоп") и начните новую ("Старт")')
         return
 
     stop_sending.clear()
     interval_seconds = await get_interval(user)
+    # TODO: seconds to minutes (via datetime?)
     first_bot_msg_time = datetime.now() + timedelta(0, interval_seconds)
     reply = f'Бот пришлет первое сообщение в {first_bot_msg_time.strftime("%H:%M")}.'
     await message.answer(reply)
@@ -134,6 +138,7 @@ async def set_replied_interval(callback_query: types.CallbackQuery):
 
     _ = await set_interval(user, interval_seconds)
 
+    # TODO: seconds to minutes (via datetime?)
     interval_representation = f'{interval_seconds} секунд'
     reply = 'Установлен интервал: {}'.format(interval_representation)
     await bot.send_message(user.id, reply)
