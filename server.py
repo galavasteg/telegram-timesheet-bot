@@ -4,15 +4,17 @@
 """
 import json
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
+from typing import Dict, Union, Tuple
 
 from aiogram import Bot, Dispatcher, executor
 from aiogram import types
+import more_itertools
 
 import settings
 import messages as msgs
 import settings.constancies as const
-from database.db_manager import DBManager
+from database.db_manager import DBManager, DoesNotExist
 from middlewares import AccessMiddleware
 
 
@@ -28,39 +30,21 @@ stop_sending = asyncio.Event()
 lock = asyncio.Lock()
 
 
-async def get_interval(user_id):
+async def get_interval(u: types.User):
     await lock.acquire()
     try:
-        return db.try_get_step(user_id)
+        interval_seconds = db.get_interval_seconds(u)
+        return interval_seconds
     finally:
         lock.release()
 
 
-async def set_interval(user_id, new_step):
+async def set_interval(u: types.User, interval_seconds):
     await lock.acquire()
     try:
-        db.try_set_step(user_id, new_step)
+        return db.set_interval_seconds(u, interval_seconds)
     finally:
         lock.release()
-
-
-async def repeat(func, *args, **kwargs):
-    """Run func every interval seconds.
-
-    If func has not finished before *interval*, will run again
-    immediately when the previous iteration finished.
-
-    *args and **kwargs are passed as the arguments to func.
-    """
-    while not stop_sending.is_set():
-        user_id = args[0]
-        fetched, step = await get_interval(user_id)
-
-        if fetched:
-            await asyncio.gather(
-                func(*args, **kwargs),
-                asyncio.sleep(step),
-        )
 
 
 @dp.message_handler(commands=('help',))
@@ -69,74 +53,70 @@ async def send_welcome(message: types.Message):
 
 
 @dp.message_handler(commands=('start',))
-async def send_start(message: types.Message):
-    msg = 'Opened session. User: ' + message.from_user.get_mention()
-    LOG.info(msg)
-    await start_routine(message)
-
-
-async def start_routine(message: types.Message):
+async def start_session(message: types.Message):
     user = message.from_user
-    now = datetime.now()
-    db.try_register_user(user)
+    db.register_user_if_not_exists(user)
 
-    started = db.try_start_session(user.id, now)
+    session_id, is_new_session = db.get_new_or_existing_session_id(user)
 
-    reply = 'Стартуем' if started is False else 'Уже стартовали'
+    if not is_new_session:
+        await message.answer('Обнаружена незавершенная сессия.'
+                             ' Закройте ее ("Стоп") и начните новую ("Старт")')
+        return
+
+    stop_sending.clear()
+    interval_seconds = await get_interval(user)
+    first_bot_msg_time = datetime.now() + timedelta(0, interval_seconds)
+    reply = f'Бот пришлет первое сообщение в {first_bot_msg_time.strftime("%H:%M")}.'
     await message.answer(reply)
 
-    if started is True:
-        stop_sending.clear()
-        await repeat(periodic, user.id)
+    LOG.info('Opened session. User: ' + user.get_mention())
+    while not stop_sending.is_set():
+        await asyncio.sleep(interval_seconds)
+        await send_choose_categories(user, session_id, interval_seconds)
 
 
 @dp.message_handler(commands=('stop',))
-async def send_stop(message: types.Message):
-    await stop_routine(message)
-    msg = 'Closed session. User: ' + message.from_user.get_mention()
-    LOG.info(msg)
-
-
-async def stop_routine(message: types.Message):
+async def stop_sesssion(message: types.Message):
     user = message.from_user
-    now = datetime.now()
 
-    stopped = db.try_stop_session(user.id, now)
+    stopped = db.try_stop_session(user)
     reply = 'Остановились' if stopped else 'Нечего останавливать'
 
     await message.answer(reply)
 
     if stopped:
         stop_sending.set()
+        msg = 'Closed session. User: ' + message.from_user.get_mention()
+        LOG.info(msg)
 
 
 @dp.message_handler(commands=('list',))
-async def send_list(message: types.Message):
-    categories = db.list_categories()
+async def list_categories_cmd(message: types.Message):
+    user = message.from_user
+    categories = db.list_categories(user)
     msg = 'Категории:\n\n{}'.format(
             '\n'.join(name for _, name in categories))
     await message.answer(msg)
 
 
 @dp.message_handler(commands=('buttons',))
-async def send_list(message: types.Message):
+async def control_buttons_cmd(message: types.Message):
+    user = message.from_user
+
     btn_start = types.KeyboardButton('Старт')
     btn_stop = types.KeyboardButton('Стоп')
-    btn_change_step = types.KeyboardButton('Сменить интервал')
-    btn_statistic = types.KeyboardButton('Отчет')
+    btn_change_step = types.KeyboardButton('Изменить интервал')
+    btn_statistic = types.KeyboardButton('Статистика>>')
 
     navigation_kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     navigation_kb.row(btn_start, btn_stop).row(btn_change_step, btn_statistic)
 
-    await message.reply("Отображаем кнопки", reply_markup=navigation_kb)
+    await bot.send_message(user.id, "Отображаем кнопки", reply_markup=navigation_kb)
 
 
 @dp.message_handler(commands=('step',))
-async def send_set_step(message: types.Message):
-    await set_step_routine(message)
-
-
-async def set_step_routine(message: types.Message):
+async def change_interval_cmd(message: types.Message):
     buttons = types.InlineKeyboardMarkup().row(*const.INTERVAL_BUTTONS)
     if settings.DEBUG_MODE:
         buttons.row(*const.DEBUG_BUTTONS)
@@ -146,10 +126,23 @@ async def set_step_routine(message: types.Message):
                            reply_markup=buttons)
 
 
+@dp.callback_query_handler(lambda c: c.message.text == const.CHOOSE_INTERVAL_TEXT)
+async def set_replied_interval(callback_query: types.CallbackQuery):
+    await bot.answer_callback_query(callback_query.id)
+    user = callback_query.from_user
+    interval_seconds = int(callback_query.data)
+
+    _ = await set_interval(user, interval_seconds)
+
+    interval_representation = f'{interval_seconds} секунд'
+    reply = 'Установлен интервал: {}'.format(interval_representation)
+    await bot.send_message(user.id, reply)
+
+
 BTNNAME_HANDLER_MAP = {
-    'Старт': start_routine,
-    'Стоп': stop_routine,
-    'Сменить интервал': set_step_routine,
+    'Старт': start_session,
+    'Стоп': stop_sesssion,
+    'Изменить интервал': change_interval_cmd,
     # TODO: implement reports
     # 'Статистика >>': start_routine,
 }
@@ -167,72 +160,59 @@ async def reply_admin_btns(message: types.Message):
         await handler(message)
 
 
-async def periodic(*args):
-    date_now = datetime.now()
-    date = str(date_now.strftime("%Y-%m-%d %H:%M:%S"))
-    data = {'name': '', 'date': date}
+def get_choose_categories_msg_payload(activity: tuple, categories: Tuple[tuple]
+                                      ) -> Dict[str, Union[str, dict]]:
+    activity_id, _, _, _, start, finish = activity
+    start = datetime.strptime(start.rsplit(".", 1)[0], "%Y-%d-%m %H:%M:%S")
+    finish = datetime.strptime(finish.rsplit(".", 1)[0], "%Y-%d-%m %H:%M:%S")
 
-    data['name'] = 'Работа'
-    work_btn = types.InlineKeyboardButton('Работа', callback_data=json.dumps(data, ensure_ascii=False))
+    category_btns = []
+    for category_id, name in categories:
+        data = json.dumps({'act_id': activity_id, 'cat_id': category_id},
+                          ensure_ascii=False)
+        category_btns.append(types.InlineKeyboardButton(name, callback_data=data))
 
-    data['name'] = 'TimeKiller'
-    time_killer_btn = types.InlineKeyboardButton('TimeKiller', callback_data=json.dumps(data, ensure_ascii=False))
+    btns_by_rows = more_itertools.chunked(category_btns, const.MAX_ROW_BUTTONS)
+    buttons = types.InlineKeyboardMarkup()
+    for btns in btns_by_rows:
+        buttons.row(*btns)
 
-    data['name'] = 'Еда'
-    food_btn = types.InlineKeyboardButton('Еда', callback_data=json.dumps(data, ensure_ascii=False))
-
-    data['name'] = 'Гулять'
-    walk_btn = types.InlineKeyboardButton('Гулять', callback_data=json.dumps(data, ensure_ascii=False))
-
-    data['name'] = 'Тренировка'
-    workout_btn = types.InlineKeyboardButton('Тренировка', callback_data=json.dumps(data, ensure_ascii=False))
-
-    data['name'] = 'Сон'
-    sleep_btn = types.InlineKeyboardButton('Сон', callback_data=json.dumps(data, ensure_ascii=False))
-
-    buttons = types.InlineKeyboardMarkup()\
-        .row(work_btn, time_killer_btn, food_btn)\
-        .row(walk_btn, workout_btn, sleep_btn)
-
-    user_id = args[0]
-    db.start_event(user_id, date)
-
-    (fetched, step) = await get_interval(user_id)
-    if fetched:
-        await bot.send_message(user_id, f'{date_now.strftime("%m-%d %H:%M:%S")}. Что делал последние: {step} секунд', reply_markup=buttons)
-    else:
-        await bot.send_message(user_id, 'Ошибка получения интервала')
+    msg_payload = {
+        'msg': 'Что делал в этот период: {event_interval}'.format(
+            event_interval=f'{start.strftime("%H:%M:%S")} - {finish.strftime("%H:%M:%S")}',
+        ),
+        'payload': {'reply_markup': buttons},
+    }
+    return msg_payload
 
 
-@dp.callback_query_handler(lambda c: 'name' in c.data and 'date' in c.data)
-async def process_callback_button1(callback_query: types.CallbackQuery):
+async def send_choose_categories(u: types.User, session_id: int, interval_seconds: int):
+    activity_id = db.start_activity(session_id, interval_seconds)
+    activity = db.get_unstopped_activity(activity_id)
+    categories = db.list_categories(u)
+
+    msg_payload = get_choose_categories_msg_payload(activity, categories)
+    await bot.send_message(u.id, msg_payload['msg'], **msg_payload['payload'])
+
+
+@dp.callback_query_handler(lambda c: 'act_id' in c.data)
+async def finish_activity(callback_query: types.CallbackQuery):
     await bot.answer_callback_query(callback_query.id)
     data = json.loads(callback_query.data)
-    user_id = callback_query.from_user.id
+    user = callback_query.from_user
 
-    stopped = db.try_stop_event(user_id, data['name'], data['date'])
-    if stopped:
-        reply = f'{data["date"]} - Заполнено. {data["name"]}'
-    else:
+    try:
+        activity_id, category_id = data['act_id'], data['cat_id']
+        db.stop_activity(activity_id, category_id)
+    except DoesNotExist:
         reply = 'Промежуток уже был заполнен'
-
-    await bot.send_message(user_id, reply)
-
-
-@dp.callback_query_handler(lambda c: c.message.text == CHOOSE_INTERVAL_TEXT)
-async def process_callback_button1(callback_query: types.CallbackQuery):
-    await bot.answer_callback_query(callback_query.id)
-    interval_seconds = int(callback_query.data)
-    # TODO: seconds to minutes (via datetime?)
-    interval_representation = f'{interval_seconds} секунд'
-
-    is_set = db.try_set_step(callback_query.from_user.id, interval_seconds)
-
-    if is_set:
-        reply = 'Интервал изменен: {}'.format(interval_representation)
+    except RuntimeError:
+        reply = 'Ошибка на сервере! Как сказал инженер Чернобыльской АЭС: "...Упс"'
     else:
-        reply = 'Интервал тот же: {}'.format(interval_representation)
-    await bot.send_message(callback_query.from_user.id, reply)
+        _, category_name = db.get_category(category_id)
+        reply = f'Заполнено: "{category_name}"'
+
+    await bot.send_message(user.id, reply)
 
 
 if __name__ == '__main__':
