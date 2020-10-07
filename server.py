@@ -196,6 +196,9 @@ def get_choose_categories_msg_payload(activity: tuple, categories: Tuple[tuple]
 
 
 async def send_choose_categories(u: types.User, session_id: int, interval_seconds: int):
+
+    if not db.has_active_session(u):
+        return
     activity_id = db.start_activity(session_id, interval_seconds)
     activity = db.get_unstopped_activity(activity_id)
     categories = db.list_categories(u)

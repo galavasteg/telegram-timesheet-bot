@@ -190,6 +190,13 @@ class DBManager:
         interval = db_user[1]
         return interval
 
+    def has_active_session(self, u: types.User) -> bool:
+        try:
+            self._get_active_session(u)
+            return True
+        except DoesNotExist:
+            return False
+
     def _get_active_session(self, u: types.User) -> tuple:
         query = SQLLiteQuery.from_(SESSION).select(SESSION.id) \
             .where(SESSION.user_telegram_id.eq(u.id)) \
