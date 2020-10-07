@@ -14,7 +14,7 @@ attrs = "==19.3.0"
 certifi = "==2019.11.28"
 chardet = "==3.0.4"
 idna = "==2.8"
-multidict = "==4.7.3"
+multidict = {path = "./multidict-4.7.6-cp38-cp38-win_amd64.whl"}
 pytz = "==2019.3"
 yarl = "==1.4.2"
 Babel = "==2.7.0"
