@@ -118,7 +118,9 @@ class DBManager:
         else:
             return existing_session[0], False
 
-    def try_stop_session(self, u: types.User):
+    def try_stop_session(self, u: types.User) -> bool:
+        """Return True if session stopped or False otherwise
+        that means that there is no active session to stop"""
         try:
             opened_session = self._get_active_session(u)
         except DoesNotExist:
@@ -134,6 +136,7 @@ class DBManager:
 
     def get_unstopped_activity(self, activity_id: str) -> tuple:
         column_value_map = {'activity_id': activity_id}
+        # TODO: refactoring, one cat table
         query = SQLLiteQuery.from_(TIMESHEET).select('*').where(
             (TIMESHEET.activity_id == Parameter(':activity_id')) &
             (TIMESHEET.default_category_id.isnull()) &
@@ -160,9 +163,9 @@ class DBManager:
             raise RuntimeError()
 
     def start_activity(self, session_id: int, interval_seconds: int) -> str:
-        columns = 'activity_id', 'session_id', 'start', 'finish'
         finish = datetime.now()
         start = finish - timedelta(0, interval_seconds)
+        columns = 'activity_id', 'session_id', 'start', 'finish'
         values = str(uuid()), session_id, str(start), str(finish)
         column_value_map = dict(zip(columns, values))
         params = map(lambda col: f':{col}', columns)
