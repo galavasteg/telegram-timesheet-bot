@@ -27,31 +27,31 @@ dp = Dispatcher(bot)
 dp.middleware.setup(AccessMiddleware(settings.ACCESS_IDS))
 
 # TODO: event for different user
-stop_sending = asyncio.Event()
-lock = asyncio.Lock()
+stop_sending_events = {} #asyncio.Event()
+locks = {} #asyncio.Lock()
 
 
 async def get_interval(u: types.User):
-    await lock.acquire()
+    await locks[u.id].acquire()
     try:
         interval_seconds = db.get_interval_seconds(u)
         return interval_seconds
     finally:
-        lock.release()
+        locks[u.id].release()
 
 
 async def set_interval(u: types.User, interval_seconds):
-    await lock.acquire()
+    await locks[u.id].acquire()
     try:
         return db.set_interval_seconds(u, interval_seconds)
     finally:
-        lock.release()
+        locks[u.id].release()
 
 
 # TODO: message actualize
 @dp.message_handler(commands=('help',))
 async def send_welcome(message: types.Message):
-    await message.answer(msgs.welcome)
+    await message.answer("Hello")#msgs.welcome)
 
 
 @dp.message_handler(commands=('start',))
@@ -67,7 +67,10 @@ async def start_session(message: types.Message):
                              ' Закройте ее ("Стоп") и начните новую ("Старт")')
         return
 
-    stop_sending.clear()
+    stop_sending_events[user.id] = asyncio.Event()
+    locks[user.id] = asyncio.Lock()
+
+    stop_sending_events[user.id].clear()
     interval_seconds = await get_interval(user)
     # TODO: seconds to minutes (via datetime?)
     first_bot_msg_time = datetime.now() + timedelta(0, interval_seconds)
@@ -75,13 +78,14 @@ async def start_session(message: types.Message):
     await message.answer(reply)
 
     LOG.info('Opened session. User: ' + user.get_mention())
-    while not stop_sending.is_set():
+    while not stop_sending_events[user.id].is_set():
+        interval_seconds = await get_interval(user)
         await asyncio.sleep(interval_seconds)
         await send_choose_categories(user, session_id, interval_seconds)
 
 
 @dp.message_handler(commands=('stop',))
-async def stop_sesssion(message: types.Message):
+async def stop_session(message: types.Message):
     user = message.from_user
 
     stopped = db.try_stop_session(user)
@@ -90,7 +94,7 @@ async def stop_sesssion(message: types.Message):
     await message.answer(reply)
 
     if stopped:
-        stop_sending.set()
+        stop_sending_events[user.id].set()
         msg = 'Closed session. User: ' + message.from_user.get_mention()
         LOG.info(msg)
 
@@ -146,7 +150,7 @@ async def set_replied_interval(callback_query: types.CallbackQuery):
 
 BTNNAME_HANDLER_MAP = {
     'Старт': start_session,
-    'Стоп': stop_sesssion,
+    'Стоп': stop_session,
     'Изменить интервал': change_interval_cmd,
     # TODO: implement reports
     # 'Статистика >>': start_routine,
