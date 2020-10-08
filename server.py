@@ -13,6 +13,7 @@ import more_itertools
 
 import settings
 import messages as msgs
+import utils
 import settings.constancies as const
 from database.db_manager import DBManager, DoesNotExist
 from middlewares import AccessMiddleware
@@ -172,8 +173,8 @@ async def reply_admin_btns(message: types.Message):
 def get_choose_categories_msg_payload(activity: tuple, categories: Tuple[tuple]
                                       ) -> Dict[str, Union[str, dict]]:
     activity_id, _, _, _, start, finish = activity
-    start = datetime.strptime(start.rsplit(".", 1)[0], "%Y-%d-%m %H:%M:%S")
-    finish = datetime.strptime(finish.rsplit(".", 1)[0], "%Y-%d-%m %H:%M:%S")
+    start = utils.parse_datetime(start)
+    finish = utils.parse_datetime(finish)
 
     category_btns = []
     for category_id, name in categories:
