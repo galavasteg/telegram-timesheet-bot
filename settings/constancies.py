@@ -17,11 +17,15 @@ DEBUG_BUTTONS = (
 )
 
 CHOOSE_STATS_TEXT = 'Статистика за какой период?'
-STATS_BUTTONS = (
-    # types.InlineKeyboardButton('За последнюю сессию', callback_data='session'),
-    types.InlineKeyboardButton('За день', callback_data='1'),
-    types.InlineKeyboardButton('За неделю', callback_data='7'),
-    types.InlineKeyboardButton('За месяц', callback_data='31'),
-    # types.InlineKeyboardButton('За текущий месяц', callback_data='7'),
-    # types.InlineKeyboardButton('За текущую неделю', callback_data='31'),
+STATS_BUTTONS = types.InlineKeyboardMarkup().row(
+    types.InlineKeyboardButton('За день', callback_data='{"days": 1}'),
+    types.InlineKeyboardButton('За неделю', callback_data='{"weeks": 1}'),
+    types.InlineKeyboardButton('За месяц', callback_data='{"months": 1}'),
+).row(
+    types.InlineKeyboardButton('За последнюю сессию', callback_data='session'),
+#     TODO:
+#     types.InlineKeyboardButton('За текущий день', callback_data='???'),
+# ).row(
+#     types.InlineKeyboardButton('За текущий месяц', callback_data='???'),
+#     types.InlineKeyboardButton('За текущую неделю', callback_data='???'),
 )

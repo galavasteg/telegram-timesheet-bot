@@ -153,11 +153,9 @@ async def set_replied_interval(callback_query: types.CallbackQuery):
 
 @dp.message_handler(commands=('step',))
 async def stats_cmd(message: types.Message):
-    buttons = types.InlineKeyboardMarkup().row(*const.STATS_BUTTONS)
-
     await bot.send_message(message.from_user.id,
                            const.CHOOSE_STATS_TEXT,
-                           reply_markup=buttons)
+                           reply_markup=const.STATS_BUTTONS)
 
 
 def increment_activities_duration(acc: datetime, activity: tuple) -> datetime:
