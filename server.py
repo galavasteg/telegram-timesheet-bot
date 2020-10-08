@@ -30,9 +30,8 @@ bot = Bot(token=settings.TELEGRAM_API_TOKEN)
 dp = Dispatcher(bot)
 dp.middleware.setup(AccessMiddleware(settings.ACCESS_IDS))
 
-# TODO: event for different user
-stop_sending_events = {} #asyncio.Event()
-locks = {} #asyncio.Lock()
+stop_sending_events = {}
+locks = {}
 
 
 async def get_interval(u: types.User):
@@ -180,7 +179,8 @@ def represent_stats(category_stats: Tuple[Dict[str, Union[timedelta, str, int]]]
     return stats_repr
 
 
-def calc_stats(activities: Tuple[tuple, ...]) -> str:
+def calc_stats(activities: List[tuple, ...]
+               ) -> Tuple[Dict[str, Union[str, int, float, timedelta]], ...]:
     category_filter = lambda activity: activity[-1]
     groups_gen = itertools.groupby(sorted(activities, key=category_filter),
                                    key=category_filter)
@@ -188,13 +188,14 @@ def calc_stats(activities: Tuple[tuple, ...]) -> str:
 
     all_activities_time = sum((stats.get('time', timedelta())
                                for stats in category_stats), timedelta())
-    _ = tuple(stats.update(percent=stats.get('time', timedelta()) / all_activities_time * 100,)
-              for stats in category_stats)
+    for stats in category_stats:
+        percent = stats.get('time', timedelta()) / all_activities_time * 100
+        stats.update(percent=percent)
 
     return category_stats
 
 
-def get_stats(u: types.User, period: Union[int, str]) -> str:
+def get_stats(u: types.User, period: Union[Dict[str, int], str]) -> str:
     t1 = datetime.now()
     msg_title = 'За {stat_period} ваша статистика следующая:'
 
@@ -259,6 +260,15 @@ async def reply_admin_btns(message: types.Message):
         await handler(message)
 
 
+def split_buttons_on_rows(btns: Iterable[types.InlineKeyboardButton]
+                          ) -> types.InlineKeyboardMarkup:
+    btns_by_rows = more_itertools.chunked(btns, const.MAX_ROW_BUTTONS)
+    buttons = types.InlineKeyboardMarkup()
+    for btns in btns_by_rows:
+        buttons.row(*btns)
+    return buttons
+
+
 def get_choose_categories_msg_payload(activity: tuple, categories: Tuple[tuple]
                                       ) -> Dict[str, Union[str, dict]]:
     activity_id, _, _, _, start, finish = activity
@@ -271,10 +281,7 @@ def get_choose_categories_msg_payload(activity: tuple, categories: Tuple[tuple]
                           ensure_ascii=False)
         category_btns.append(types.InlineKeyboardButton(name, callback_data=data))
 
-    btns_by_rows = more_itertools.chunked(category_btns, const.MAX_ROW_BUTTONS)
-    buttons = types.InlineKeyboardMarkup()
-    for btns in btns_by_rows:
-        buttons.row(*btns)
+    buttons = split_buttons_on_rows(category_btns)
 
     msg_payload = {
         'msg': 'Что делал в этот период: {event_interval}'.format(
