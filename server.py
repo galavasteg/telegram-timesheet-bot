@@ -211,12 +211,12 @@ def get_stats(u: types.User, period: Union[int, str]) -> str:
     try:
         activities = db.get_timesheet_frame_by_sessions(session_ids)
     except DoesNotExist:
-        stats_repr = 'Вы не завиксировали ни одной активности.'
+        stats_repr = 'Вы не зафиксировали ни одной активности.'
     else:
         # TODO: other representations
         stats = calc_stats(activities)
         stats_repr = represent_stats(stats)
-        stats_repr = f'{msg_title}\n```{stats_repr}```'
+        stats_repr = f'{msg_title}\n`{stats_repr}`'
         stats_repr = stats_repr.format(stat_period=stat_period)
 
     return stats_repr
@@ -309,9 +309,9 @@ async def finish_activity(callback_query: types.CallbackQuery):
         reply = 'Ошибка на сервере! Как сказал инженер Чернобыльской АЭС: "...Упс"'
     else:
         _, category_name = db.get_category(category_id)
-        reply = f'Заполнено: "{category_name}"'
+        reply = f'Заполнено: `{category_name}`'
 
-    await bot.send_message(user.id, reply)
+    await bot.send_message(user.id, reply, parse_mode='Markdown')
 
 
 if __name__ == '__main__':
