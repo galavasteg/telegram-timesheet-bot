@@ -2,6 +2,7 @@
 Запускаемый сервер Telegram бота
 
 """
+import functools
 import itertools
 import json
 import asyncio
@@ -158,42 +159,67 @@ async def stats_cmd(message: types.Message):
                            const.CHOOSE_STATS_TEXT,
                            reply_markup=buttons)
 
-def category_stat_presenter(category: str, activities: list) -> str:
-    repr_tmplt = '{category}: {time} ({percent})'
-    time_ = '02:15'
-    percent = '50%'
-    stat_repr = repr_tmplt.format(category=category, time=time_, percent=percent)
+
+def increment_activities_duration(acc: datetime, activity: tuple) -> datetime:
+    start, finish = map(utils.parse_datetime, activity[-3:-1])
+    duration = finish - start
+    acc += duration
+    return acc
+
+
+def calc_category_stats(category: str, activities: itertools._grouper) -> Dict[str, Union[timedelta, str, int]]:
+    time_ = functools.reduce(increment_activities_duration,
+                             tuple(activities), timedelta())
+    stat_repr = dict(category=category, time=time_)
     return stat_repr
 
 
-def calculate_stats(activities: Tuple[tuple, ...]) -> str:
+def represent_stats(category_stats: Tuple[Dict[str, Union[timedelta, str, int]]],) -> str:
+    category_stat_template = '{category:<15} {time} ({percent:.2f}%)'
+    stats_repr = '\n'.join(category_stat_template.format(**stats)
+                           for stats in category_stats)
+    return stats_repr
+
+
+def calc_stats(activities: Tuple[tuple, ...]) -> str:
     category_filter = lambda activity: activity[-1]
     groups_gen = itertools.groupby(sorted(activities, key=category_filter),
                                    key=category_filter)
-    stats = '\n'.join(category_stat_presenter(category, activities)
-                      for category, activities in groups_gen)
-    return stats
+    category_stats = tuple(itertools.starmap(calc_category_stats, groups_gen))
+
+    all_activities_time = sum((stats.get('time', timedelta())
+                               for stats in category_stats), timedelta())
+    _ = tuple(stats.update(percent=stats.get('time', timedelta()) / all_activities_time * 100,)
+              for stats in category_stats)
+
+    return category_stats
 
 
 def get_stats(u: types.User, period: Union[int, str]) -> str:
     t1 = datetime.now()
+    msg_title = 'За {stat_period} ваша статистика следующая:'
     if isinstance(period, int):
         days = period
         t0 = t1 - timedelta(days)
+        stat_period = f'{t0} - {t1}'
         sessions = db.filter_user_sessions_by_start(u, t0)
     else:  # period == 'session':
+        stat_period = f'последнюю сессию'
         sessions = (db.get_last_started_session(u),)
 
     session_ids = tuple(session[0] for session in sessions)
     try:
         activities = db.get_timesheet_frame_by_sessions(session_ids)
     except DoesNotExist:
-        stats = 'Вы не завиксировали ни одной активности.'
+        stats_repr = 'Вы не завиксировали ни одной активности.'
     else:
         # TODO: other representations
-        stats = calculate_stats(activities)
+        stats = calc_stats(activities)
+        stats_repr = represent_stats(stats)
+        stats_repr = f'{msg_title}\n```{stats_repr}```'
+        stats_repr = stats_repr.format(stat_period=stat_period)
 
-    return stats
+    return stats_repr
 
 
 @dp.callback_query_handler(lambda c: c.message.text == const.CHOOSE_STATS_TEXT)
@@ -205,7 +231,7 @@ async def get_requested_stats(callback_query: types.CallbackQuery):
     stats = get_stats(user, stats_period)
     reply = stats
 
-    await bot.send_message(user.id, reply)
+    await bot.send_message(user.id, reply, parse_mode="Markdown")
 
 
 BTNNAME_HANDLER_MAP = {

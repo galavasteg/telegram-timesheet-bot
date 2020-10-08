@@ -235,7 +235,7 @@ class DBManager:
             ))) \
             .select(
                 TIMESHEET.star,
-                (TIMESHEET.finish - TIMESHEET.start).as_('activity_duration'),
+                # (TIMESHEET.finish - TIMESHEET.start).as_('activity_duration'),  # datetime in sqlite in str
                 CATEGORY.name) \
             .where(TIMESHEET.session_id.isin(session_ids)).get_sql()
 
