@@ -201,7 +201,7 @@ def get_stats(u: types.User, period: Union[int, str]) -> str:
     if isinstance(period, int):
         days = period
         t0 = t1 - timedelta(days)
-        stat_period = f'{t0} - {t1}'
+        stat_period = f'{utils.parse_datetime(str(t0))} - {utils.parse_datetime(str(t1))}'
         sessions = db.filter_user_sessions_by_start(u, t0)
     else:  # period == 'session':
         stat_period = f'последнюю сессию'
@@ -231,6 +231,7 @@ async def get_requested_stats(callback_query: types.CallbackQuery):
     stats = get_stats(user, stats_period)
     reply = stats
 
+    #TODO: fix time and 1st cat name
     await bot.send_message(user.id, reply, parse_mode="Markdown")
 
 
