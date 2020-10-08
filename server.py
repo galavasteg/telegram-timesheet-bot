@@ -179,7 +179,7 @@ def represent_stats(category_stats: Tuple[Dict[str, Union[timedelta, str, int]]]
     return stats_repr
 
 
-def calc_stats(activities: List[tuple, ...]
+def calc_stats(activities: List[tuple]
                ) -> Tuple[Dict[str, Union[str, int, float, timedelta]], ...]:
     category_filter = lambda activity: activity[-1]
     groups_gen = itertools.groupby(sorted(activities, key=category_filter),
