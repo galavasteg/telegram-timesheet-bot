@@ -94,7 +94,7 @@ async def stop_session(message: types.Message):
 
     await message.answer(reply)
 
-    if stopped:
+    if stopped and user.id in stop_sending_events:
         stop_sending_events[user.id].set()
         msg = 'Closed session. User: ' + message.from_user.get_mention()
         LOG.info(msg)
