@@ -1,11 +1,11 @@
 import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, List
 from uuid import uuid4 as uuid
 
 from aiogram import types
-from pypika import Table, SQLLiteQuery, Parameter
+from pypika import Table, SQLLiteQuery, Parameter, Order, Criterion
 # SQLLiteQuery = SQLLiteQuery
 from settings.config import DB_NAME, DB_MIGRATIONS_DIR, DEBUG_MODE
 from settings.constancies import DEFAULT_INTERVAL_SECONDS
@@ -118,6 +118,19 @@ class DBManager:
         else:
             return existing_session[0], False
 
+    def get_last_started_session(self, u: types.User) -> int:
+        query = SQLLiteQuery().from_(SESSION).select('*') \
+            .where(SESSION.user_telegram_id.eq(Parameter(':user_id'))) \
+            .orderby(SESSION.start_at, Order.desc) \
+            .limit(1).get_sql()
+
+        session = self._cursor.execute(query, {'user_id': u.id}).fetchone()
+
+        if not session:
+            raise DoesNotExist()
+
+        return session
+
     def try_stop_session(self, u: types.User) -> bool:
         """Return True if session stopped or False otherwise
         that means that there is no active session to stop"""
@@ -210,3 +223,38 @@ class DBManager:
             raise DoesNotExist(query.get_sql())
 
         return session
+
+    def get_timesheet_frame_by_sessions(self, session_ids: tuple) -> List[tuple]:
+        if not session_ids:
+            raise DoesNotExist()
+
+        query = SQLLiteQuery().from_(TIMESHEET) \
+            .inner_join(CATEGORY).on(Criterion.all((
+                TIMESHEET.default_category_id.notnull(),
+                TIMESHEET.default_category_id.eq(CATEGORY.id),
+            ))) \
+            .select(
+                TIMESHEET.star,
+                (TIMESHEET.finish - TIMESHEET.start).as_('activity_duration'),
+                CATEGORY.name) \
+            .where(TIMESHEET.session_id.isin(session_ids)).get_sql()
+
+        timesheet_frame = self._cursor.execute(query).fetchall()
+
+        if not timesheet_frame:
+            raise DoesNotExist()
+
+        return timesheet_frame
+
+    def filter_user_sessions_by_start(self, u: types.User, start: datetime) -> List[tuple]:
+        params = {'t0': start, ':user_id': u.id}
+        query = '''
+            select * from session where :t0 <= start_at
+        '''
+
+        sessions_frame = self._cursor.execute(query, params).fetchall()
+
+        if not sessions_frame:
+            raise DoesNotExist()
+
+        return sessions_frame

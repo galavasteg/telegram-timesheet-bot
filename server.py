@@ -2,6 +2,7 @@
 Запускаемый сервер Telegram бота
 
 """
+import itertools
 import json
 import asyncio
 from datetime import datetime, timedelta
@@ -116,7 +117,7 @@ async def control_buttons_cmd(message: types.Message):
     btn_start = types.KeyboardButton('Старт')
     btn_stop = types.KeyboardButton('Стоп')
     btn_change_step = types.KeyboardButton('Изменить интервал')
-    btn_statistic = types.KeyboardButton('Статистика>>')
+    btn_statistic = types.KeyboardButton('Статистика >>')
 
     navigation_kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     navigation_kb.row(btn_start, btn_stop).row(btn_change_step, btn_statistic)
@@ -149,12 +150,69 @@ async def set_replied_interval(callback_query: types.CallbackQuery):
     await bot.send_message(user.id, reply)
 
 
+@dp.message_handler(commands=('step',))
+async def stats_cmd(message: types.Message):
+    buttons = types.InlineKeyboardMarkup().row(*const.STATS_BUTTONS)
+
+    await bot.send_message(message.from_user.id,
+                           const.CHOOSE_STATS_TEXT,
+                           reply_markup=buttons)
+
+def category_stat_presenter(category: str, activities: list) -> str:
+    repr_tmplt = '{category}: {time} ({percent})'
+    time_ = '02:15'
+    percent = '50%'
+    stat_repr = repr_tmplt.format(category=category, time=time_, percent=percent)
+    return stat_repr
+
+
+def calculate_stats(activities: Tuple[tuple, ...]) -> str:
+    category_filter = lambda activity: activity[-1]
+    groups_gen = itertools.groupby(sorted(activities, key=category_filter),
+                                   key=category_filter)
+    stats = '\n'.join(category_stat_presenter(category, activities)
+                      for category, activities in groups_gen)
+    return stats
+
+
+def get_stats(u: types.User, period: Union[int, str]) -> str:
+    t1 = datetime.now()
+    if isinstance(period, int):
+        days = period
+        t0 = t1 - timedelta(days)
+        sessions = db.filter_user_sessions_by_start(u, t0)
+    else:  # period == 'session':
+        sessions = (db.get_last_started_session(u),)
+
+    session_ids = tuple(session[0] for session in sessions)
+    try:
+        activities = db.get_timesheet_frame_by_sessions(session_ids)
+    except DoesNotExist:
+        stats = 'Вы не завиксировали ни одной активности.'
+    else:
+        # TODO: other representations
+        stats = calculate_stats(activities)
+
+    return stats
+
+
+@dp.callback_query_handler(lambda c: c.message.text == const.CHOOSE_STATS_TEXT)
+async def get_requested_stats(callback_query: types.CallbackQuery):
+    await bot.answer_callback_query(callback_query.id)
+    user = callback_query.from_user
+    stats_period = int(callback_query.data)
+
+    stats = get_stats(user, stats_period)
+    reply = stats
+
+    await bot.send_message(user.id, reply)
+
+
 BTNNAME_HANDLER_MAP = {
     'Старт': start_session,
     'Стоп': stop_session,
     'Изменить интервал': change_interval_cmd,
-    # TODO: implement reports
-    # 'Статистика >>': start_routine,
+    'Статистика >>': stats_cmd,
 }
 
 
@@ -198,6 +256,7 @@ def get_choose_categories_msg_payload(activity: tuple, categories: Tuple[tuple]
 
 async def send_choose_categories(u: types.User, session_id: int, interval_seconds: int):
 
+    # TODO: why not to use get_active_session
     if not db.has_active_session(u):
         return
     activity_id = db.start_activity(session_id, interval_seconds)

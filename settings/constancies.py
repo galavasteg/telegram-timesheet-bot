@@ -15,3 +15,13 @@ DEBUG_BUTTONS = (
     types.InlineKeyboardButton('10 секунд (тест)', callback_data=str(10)),
     types.InlineKeyboardButton('30 секунд (тест)', callback_data=str(30)),
 )
+
+CHOOSE_STATS_TEXT = 'Статистика за какой период?'
+STATS_BUTTONS = (
+    # types.InlineKeyboardButton('За последнюю сессию', callback_data='session'),
+    types.InlineKeyboardButton('За день', callback_data='1'),
+    types.InlineKeyboardButton('За неделю', callback_data='7'),
+    types.InlineKeyboardButton('За месяц', callback_data='31'),
+    # types.InlineKeyboardButton('За текущий месяц', callback_data='7'),
+    # types.InlineKeyboardButton('За текущую неделю', callback_data='31'),
+)
