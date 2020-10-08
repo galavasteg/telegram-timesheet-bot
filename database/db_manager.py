@@ -121,7 +121,7 @@ class DBManager:
     def get_last_started_session(self, u: types.User) -> int:
         query = SQLLiteQuery().from_(SESSION).select('*') \
             .where(SESSION.user_telegram_id.eq(Parameter(':user_id'))) \
-            .orderby(SESSION.start_at, Order.desc) \
+            .orderby(SESSION.start_at, order=Order.desc) \
             .limit(1).get_sql()
 
         session = self._cursor.execute(query, {'user_id': u.id}).fetchone()

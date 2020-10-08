@@ -7,10 +7,11 @@ import itertools
 import json
 import asyncio
 from datetime import datetime, timedelta
-from typing import Dict, Union, Tuple
+from typing import Dict, Union, Tuple, Iterable, List
 
 from aiogram import Bot, Dispatcher, executor
 from aiogram import types
+from dateutil.relativedelta import relativedelta
 import more_itertools
 
 import settings
@@ -196,14 +197,17 @@ def calc_stats(activities: Tuple[tuple, ...]) -> str:
 def get_stats(u: types.User, period: Union[int, str]) -> str:
     t1 = datetime.now()
     msg_title = 'За {stat_period} ваша статистика следующая:'
-    if isinstance(period, int):
-        days = period
-        t0 = t1 - timedelta(days)
-        stat_period = f'{utils.parse_datetime(str(t0))} - {utils.parse_datetime(str(t1))}'
+
+    if isinstance(period, dict):
+        if 'months' in period:
+            t0 = t1 - relativedelta(**period)
+        else:
+            t0 = t1 - timedelta(**period)
         sessions = db.filter_user_sessions_by_start(u, t0)
+        stat_period = f'{utils.parse_datetime(str(t0))} - {utils.parse_datetime(str(t1))}'
     else:  # period == 'session':
-        stat_period = f'последнюю сессию'
         sessions = (db.get_last_started_session(u),)
+        stat_period = f'последнюю сессию'
 
     session_ids = tuple(session[0] for session in sessions)
     try:
@@ -224,12 +228,14 @@ def get_stats(u: types.User, period: Union[int, str]) -> str:
 async def get_requested_stats(callback_query: types.CallbackQuery):
     await bot.answer_callback_query(callback_query.id)
     user = callback_query.from_user
-    stats_period = int(callback_query.data)
+    try:
+        stats_period = json.loads(callback_query.data)
+    except ValueError:
+        stats_period = callback_query.data
 
     stats = get_stats(user, stats_period)
     reply = stats
 
-    #TODO: fix time and 1st cat name
     await bot.send_message(user.id, reply, parse_mode="Markdown")
 
 

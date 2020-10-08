@@ -12,3 +12,4 @@ PyPika==0.42.1
 python-dotenv==0.14.0
 pytz==2019.3
 yarl==1.4.2
+python-dateutil==2.8.1
