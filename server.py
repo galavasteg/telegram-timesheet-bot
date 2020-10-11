@@ -6,6 +6,7 @@ import functools
 import itertools
 import json
 import asyncio
+import uuid
 from datetime import datetime, timedelta
 from typing import Dict, Union, Tuple, Iterable, List
 
@@ -60,6 +61,15 @@ async def send_welcome(message: types.Message):
 @dp.message_handler(commands=('start',))
 async def start_session(message: types.Message):
     user = message.from_user
+
+    btn_start = types.KeyboardButton('Старт')
+    btn_stop = types.KeyboardButton('Стоп')
+    btn_change_step = types.KeyboardButton('Изменить интервал')
+    btn_statistic = types.KeyboardButton('Статистика>>')
+
+    navigation_kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    navigation_kb.row(btn_start, btn_stop).row(btn_change_step, btn_statistic)
+
     db.register_user_if_not_exists(user)
 
     session_id, is_new_session = db.get_new_or_existing_session_id(user)
@@ -77,8 +87,8 @@ async def start_session(message: types.Message):
     interval_seconds = await get_interval(user)
     # TODO: seconds to minutes (via datetime?)
     first_bot_msg_time = datetime.now() + timedelta(0, interval_seconds)
-    reply = f'Бот пришлет первое сообщение в {first_bot_msg_time.strftime("%H:%M")}.'
-    await message.answer(reply)
+    reply = f'Бот пришлет первое сообщение в {first_bot_msg_time.strftime("%H:%M:%S")}.'
+    await message.answer(reply, reply_markup=navigation_kb)
 
     LOG.info('Opened session. User: ' + user.get_mention())
     while not stop_sending_events[user.id].is_set():
@@ -97,7 +107,8 @@ async def stop_session(message: types.Message):
     await message.answer(reply)
 
     if stopped and user.id in stop_sending_events:
-        stop_sending_events[user.id].set()
+        if user.id in stop_sending_events:
+            stop_sending_events[user.id].set()
         msg = 'Closed session. User: ' + message.from_user.get_mention()
         LOG.info(msg)
 
