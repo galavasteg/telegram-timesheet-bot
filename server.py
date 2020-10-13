@@ -41,11 +41,14 @@ async def get_interval(u: types.User):
 
 
 async def set_interval(u: types.User, interval_seconds):
-    await locks[u.id].acquire()
-    try:
-        return db.set_interval_seconds(u, interval_seconds)
-    finally:
-        locks[u.id].release()
+    if u.id in locks:
+        async with locks[u.id]:
+            rows_num = db.set_interval_seconds(u, interval_seconds)
+    else:
+        db.register_user_if_not_exists(u)
+        rows_num = db.set_interval_seconds(u, interval_seconds)
+
+    return rows_num
 
 
 @dp.message_handler(commands=('help',))
@@ -134,11 +137,6 @@ async def control_buttons_cmd(message: types.Message):
 
 
 async def change_interval_cmd(message: types.Message):
-
-    if not db.has_active_session(message.from_user):
-        await bot.send_message(message.from_user.id, const.START_SESSION_BEFOREHAND)
-        return
-
     buttons = types.InlineKeyboardMarkup().row(*const.INTERVAL_BUTTONS)
     if settings.DEBUG_MODE:
         buttons.row(*const.DEBUG_BUTTONS)
