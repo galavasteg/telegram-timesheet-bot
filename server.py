@@ -72,7 +72,7 @@ async def start_session(message: types.Message):
     btn_start = types.KeyboardButton('Старт')
     btn_stop = types.KeyboardButton('Стоп')
     btn_change_step = types.KeyboardButton('Изменить интервал')
-    btn_statistic = types.KeyboardButton('Статистика>>')
+    btn_statistic = types.KeyboardButton('Статистика >>')
 
     navigation_kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     navigation_kb.row(btn_start, btn_stop).row(btn_change_step, btn_statistic)
