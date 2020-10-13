@@ -7,7 +7,7 @@ from uuid import uuid4 as uuid
 from aiogram import types
 from pypika import Table, SQLLiteQuery, Parameter, Order, Criterion
 # SQLLiteQuery = SQLLiteQuery
-from settings.config import DB_NAME, DB_MIGRATIONS_DIR, DEBUG_MODE
+from settings.config import DB_NAME, DB_MIGRATIONS_DIR, DEBUG_MODE, LOG
 from settings.constancies import DEFAULT_INTERVAL_SECONDS
 
 
@@ -27,7 +27,7 @@ class DBManager:
     def __init__(self):
         self._con = sqlite3.Connection(DB_NAME)
         if DEBUG_MODE:
-            self._con.set_trace_callback(print)
+            self._con.set_trace_callback(LOG.debug)
         self._cursor = self._con.cursor()
 
     def __del__(self):
