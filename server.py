@@ -35,12 +35,9 @@ locks = {}
 
 
 async def get_interval(u: types.User):
-    await locks[u.id].acquire()
-    try:
+    async with locks[u.id]:
         interval_seconds = db.get_interval_seconds(u)
-        return interval_seconds
-    finally:
-        locks[u.id].release()
+    return interval_seconds
 
 
 async def set_interval(u: types.User, interval_seconds):
