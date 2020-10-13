@@ -16,6 +16,6 @@ class AccessMiddleware(BaseMiddleware):
         super().__init__()
 
     async def on_process_message(self, message: types.Message, _) -> None:
-        if int(message.from_user.id) not in self.access_ids:
+        if self.access_ids and int(message.from_user.id) not in self.access_ids:
             await message.answer("Access Denied")
             raise CancelHandler()
