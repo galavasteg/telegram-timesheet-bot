@@ -141,6 +141,11 @@ async def control_buttons_cmd(message: types.Message):
 
 @dp.message_handler(commands=('step',))
 async def change_interval_cmd(message: types.Message):
+
+    if not db.has_active_session(message.from_user):
+        await bot.send_message(message.from_user.id, const.START_SESSION_BEFOREHAND)
+        return
+
     buttons = types.InlineKeyboardMarkup().row(*const.INTERVAL_BUTTONS)
     if settings.DEBUG_MODE:
         buttons.row(*const.DEBUG_BUTTONS)
