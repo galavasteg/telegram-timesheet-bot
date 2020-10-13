@@ -34,9 +34,12 @@ _base_cmds_s = _represent_commands(_base_cmds)
 
 # TODO: add link on description article
 WELCOME = (
-    f'Бот для учёта времени.\n\n'
+    'Бот для учёта времени.\n'
+    'Вы можете настроить временной интервал'
+    ' (по умолчанию, 15 мин), с которым бот'
+    ' будет вас опрашивать.\n\n'
     
-    f'Чтобы начать нажмите: /start\n\n'
+    'Чтобы начать нажмите: /start\n\n'
     
     'ПРОЧИЕ КОМАНДЫ\n'
     f'{_base_cmds_s}\n\n'
