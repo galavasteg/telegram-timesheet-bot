@@ -136,7 +136,6 @@ async def control_buttons_cmd(message: types.Message):
     await bot.send_message(user.id, "Отображаем кнопки", reply_markup=navigation_kb)
 
 
-@dp.message_handler(commands=('step',))
 async def change_interval_cmd(message: types.Message):
 
     if not db.has_active_session(message.from_user):
@@ -166,7 +165,6 @@ async def set_replied_interval(callback_query: types.CallbackQuery):
     await bot.send_message(user.id, reply)
 
 
-@dp.message_handler(commands=('step',))
 async def stats_cmd(message: types.Message):
     await bot.send_message(message.from_user.id,
                            const.CHOOSE_STATS_TEXT,
