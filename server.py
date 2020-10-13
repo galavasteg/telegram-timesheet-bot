@@ -58,6 +58,13 @@ async def send_welcome(message: types.Message):
     await message.answer("Hello")#msgs.welcome)
 
 
+async def send_events_coro(user, session_id):
+    while True:
+        interval_seconds = await get_interval(user)
+        await asyncio.sleep(interval_seconds)
+        await send_choose_categories(user, session_id, interval_seconds)
+
+
 @dp.message_handler(commands=('start',))
 async def start_session(message: types.Message):
     user = message.from_user
@@ -80,10 +87,7 @@ async def start_session(message: types.Message):
                              ' Закройте ее ("Стоп") и начните новую ("Старт")')
         return
 
-    stop_sending_events[user.id] = asyncio.Event()
     locks[user.id] = asyncio.Lock()
-
-    stop_sending_events[user.id].clear()
     interval_seconds = await get_interval(user)
     # TODO: seconds to minutes (via datetime?)
     first_bot_msg_time = datetime.now() + timedelta(0, interval_seconds)
@@ -91,10 +95,10 @@ async def start_session(message: types.Message):
     await message.answer(reply, reply_markup=navigation_kb)
 
     LOG.info('Opened session. User: ' + user.get_mention())
-    while not stop_sending_events[user.id].is_set():
-        interval_seconds = await get_interval(user)
-        await asyncio.sleep(interval_seconds)
-        await send_choose_categories(user, session_id, interval_seconds)
+
+    stop_sending_events[user.id] = asyncio.create_task(send_events_coro(user, session_id))
+    await stop_sending_events[user.id]
+
 
 
 @dp.message_handler(commands=('stop',))
@@ -107,8 +111,7 @@ async def stop_session(message: types.Message):
     await message.answer(reply)
 
     if stopped and user.id in stop_sending_events:
-        if user.id in stop_sending_events:
-            stop_sending_events[user.id].set()
+        stop_sending_events[user.id].cancel()
         msg = 'Closed session. User: ' + message.from_user.get_mention()
         LOG.info(msg)
 
@@ -283,8 +286,8 @@ def split_buttons_on_rows(btns: Iterable[types.InlineKeyboardButton]
 def get_choose_categories_msg_payload(activity: tuple, categories: Tuple[tuple]
                                       ) -> Dict[str, Union[str, dict]]:
     activity_id, _, _, _, start, finish = activity
-    start = utils.parse_datetime(start)
-    finish = utils.parse_datetime(finish)
+#start = utils.parse_datetime(start)
+#   finish = utils.parse_datetime(finish)
 
     category_btns = []
     for category_id, name in categories:
@@ -296,7 +299,7 @@ def get_choose_categories_msg_payload(activity: tuple, categories: Tuple[tuple]
 
     msg_payload = {
         'msg': 'Что делал в этот период: {event_interval}'.format(
-            event_interval=f'{start.strftime("%H:%M:%S")} - {finish.strftime("%H:%M:%S")}',
+            event_interval=f'{start} - {finish}',
         ),
         'payload': {'reply_markup': buttons},
     }
