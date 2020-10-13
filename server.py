@@ -54,7 +54,7 @@ async def set_interval(u: types.User, interval_seconds):
 # TODO: message actualize
 @dp.message_handler(commands=('help',))
 async def send_welcome(message: types.Message):
-    await message.answer("Hello")#msgs.welcome)
+    await message.answer(msgs.WELCOME)
 
 
 async def send_events_coro(user, session_id):
@@ -97,7 +97,6 @@ async def start_session(message: types.Message):
 
     stop_sending_events[user.id] = asyncio.create_task(send_events_coro(user, session_id))
     await stop_sending_events[user.id]
-
 
 
 @dp.message_handler(commands=('stop',))
