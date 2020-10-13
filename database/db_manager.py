@@ -190,7 +190,7 @@ class DBManager:
 
         return column_value_map['activity_id']
 
-    def set_interval_seconds(self, u: types.User, interval_seconds: int):
+    def set_interval_seconds(self, u: types.User, interval_seconds: int) -> int:
         query = SQLLiteQuery.update(USER) \
             .set(USER.interval_seconds, interval_seconds) \
             .where(USER.telegram_id.eq(u.id))

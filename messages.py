@@ -32,7 +32,7 @@ _base_cmds_s = _represent_commands(_base_cmds)
 # _stat_cmds_s = '\n'.join(f'/{name} - {descr}' for name, descr
 #                          in _stat_cmds.items())
 
-
+# TODO: add link on description article
 WELCOME = (
     f'Бот для учёта времени.\n\n'
     
@@ -41,3 +41,8 @@ WELCOME = (
     'ПРОЧИЕ КОМАНДЫ\n'
     f'{_base_cmds_s}\n\n'
 )
+
+FIRST_BOT_MSG = 'Бот пришлет первое сообщение в {time}.'
+
+CLOSE_SESSION_PLS = 'Обнаружена незавершенная сессия.' \
+                    ' Закройте ее ("Стоп") и начните новую ("Старт")'

@@ -51,7 +51,6 @@ async def set_interval(u: types.User, interval_seconds):
         locks[u.id].release()
 
 
-# TODO: message actualize
 @dp.message_handler(commands=('help',))
 async def send_welcome(message: types.Message):
     await message.answer(msgs.WELCOME)
@@ -81,16 +80,15 @@ async def start_session(message: types.Message):
     session_id, is_new_session = db.get_new_or_existing_session_id(user)
 
     if not is_new_session:
-        # TODO: all message tmpls to constants
-        await message.answer('Обнаружена незавершенная сессия.'
-                             ' Закройте ее ("Стоп") и начните новую ("Старт")')
+        await message.answer(msgs.CLOSE_SESSION_PLS)
         return
 
     locks[user.id] = asyncio.Lock()
     interval_seconds = await get_interval(user)
     # TODO: seconds to minutes (via datetime?)
     first_bot_msg_time = datetime.now() + timedelta(0, interval_seconds)
-    reply = f'Бот пришлет первое сообщение в {first_bot_msg_time.strftime("%H:%M:%S")}.'
+    reply = msgs.FIRST_BOT_MSG.format(
+        time=first_bot_msg_time.strftime("%H:%M:%S"))
     await message.answer(reply, reply_markup=navigation_kb)
 
     LOG.info('Opened session. User: ' + user.get_mention())
@@ -182,7 +180,8 @@ def increment_activities_duration(acc: datetime, activity: tuple) -> datetime:
     return acc
 
 
-def calc_category_stats(category: str, activities: itertools._grouper) -> Dict[str, Union[timedelta, str, int]]:
+def calc_category_stats(category: str, activities: itertools._grouper
+                        ) -> Dict[str, Union[timedelta, str, int]]:
     time_ = functools.reduce(increment_activities_duration,
                              tuple(activities), timedelta())
     stat_repr = dict(category=category, time=time_)
@@ -310,10 +309,9 @@ def get_choose_categories_msg_payload(activity: tuple, categories: Tuple[tuple]
 
 
 async def send_choose_categories(u: types.User, session_id: int, interval_seconds: int):
-
-    # TODO: why not to use get_active_session
     if not db.has_active_session(u):
         return
+
     activity_id = db.start_activity(session_id, interval_seconds)
     activity = db.get_unstopped_activity(activity_id)
     categories = db.list_categories(u)
