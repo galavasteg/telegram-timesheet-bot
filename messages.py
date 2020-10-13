@@ -36,7 +36,7 @@ _base_cmds_s = _represent_commands(_base_cmds)
 WELCOME = (
     f'Бот для учёта времени.\n\n'
     
-    f'Чтобы начать нажмите: /start'
+    f'Чтобы начать нажмите: /start\n\n'
     
     'ПРОЧИЕ КОМАНДЫ\n'
     f'{_base_cmds_s}\n\n'
