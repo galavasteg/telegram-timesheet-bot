@@ -285,8 +285,8 @@ def split_buttons_on_rows(btns: Iterable[types.InlineKeyboardButton]
 def get_choose_categories_msg_payload(activity: tuple, categories: Tuple[tuple]
                                       ) -> Dict[str, Union[str, dict]]:
     activity_id, _, _, _, start, finish = activity
-#start = utils.parse_datetime(start)
-#   finish = utils.parse_datetime(finish)
+    start = utils.parse_datetime(start)
+    finish = utils.parse_datetime(finish)
 
     category_btns = []
     for category_id, name in categories:
@@ -298,7 +298,7 @@ def get_choose_categories_msg_payload(activity: tuple, categories: Tuple[tuple]
 
     msg_payload = {
         'msg': 'Что делал в этот период: {event_interval}'.format(
-            event_interval=f'{start} - {finish}',
+            event_interval=f'{start.strftime("%H:%M:%S")} - {finish.strftime("%H:%M:%S")}',
         ),
         'payload': {'reply_markup': buttons},
     }
