@@ -219,16 +219,13 @@ def get_stats(u: types.User, period: Union[Dict[str, int], str]) -> str:
         stat_period = f'последнюю сессию'
 
     session_ids = tuple(session[0] for session in sessions)
-    try:
-        activities = db.get_timesheet_frame_by_sessions(session_ids)
-    except DoesNotExist:
-        stats_repr = 'Вы не зафиксировали ни одной активности.'
-    else:
-        # TODO: other representations
-        stats = calc_stats(activities)
-        stats_repr = represent_stats(stats)
-        stats_repr = f'{msg_title}\n`{stats_repr}`'
-        stats_repr = stats_repr.format(stat_period=stat_period)
+    activities = db.get_timesheet_frame_by_sessions(session_ids)
+
+    # TODO: other representations
+    stats = calc_stats(activities)
+    stats_repr = represent_stats(stats)
+    stats_repr = f'{msg_title}\n`{stats_repr}`'
+    stats_repr = stats_repr.format(stat_period=stat_period)
 
     return stats_repr
 
@@ -242,8 +239,13 @@ async def get_requested_stats(callback_query: types.CallbackQuery):
     except ValueError:
         stats_period = callback_query.data
 
-    stats = get_stats(user, stats_period)
-    reply = stats
+    try:
+        stats = get_stats(user, stats_period)
+    except DoesNotExist:
+        reply = 'За данный период ничего не найдено!'
+
+    else:
+        reply = stats
 
     await bot.send_message(user.id, reply, parse_mode="Markdown")
 
