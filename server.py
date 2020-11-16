@@ -86,6 +86,12 @@ async def start_session(message: types.Message):
         await message.answer(msgs.CLOSE_SESSION_PLS)
         return
 
+    await message.answer('У вас есть {wait_for_sec} секунд, чтобы выбрать интервал на эту сессию.'.format(
+        wait_for_sec=const.WAIT_INTERVAL_FROM_USER_BEFORE_START
+    ))
+    await change_interval_cmd(message)
+    await asyncio.sleep(const.WAIT_INTERVAL_FROM_USER_BEFORE_START)
+
     locks[user.id] = asyncio.Lock()
     interval_seconds = await get_interval(user)
     # TODO: seconds to minutes (via datetime?)
@@ -136,9 +142,7 @@ async def change_interval_cmd(message: types.Message):
     if settings.DEBUG_MODE:
         buttons.row(*const.DEBUG_BUTTONS)
 
-    await bot.send_message(message.from_user.id,
-                           const.CHOOSE_INTERVAL_TEXT,
-                           reply_markup=buttons)
+    await bot.send_message(message.from_user.id, const.CHOOSE_INTERVAL_TEXT, reply_markup=buttons)
 
 
 @dp.callback_query_handler(lambda c: c.message.text == const.CHOOSE_INTERVAL_TEXT)
@@ -273,8 +277,7 @@ def split_buttons_on_rows(btns: Iterable[types.InlineKeyboardButton]
     return buttons
 
 
-def get_choose_categories_msg_payload(activity: tuple, categories: Tuple[tuple]
-                                      ) -> Dict[str, Union[str, dict]]:
+def get_choose_categories_msg_payload(activity: tuple, categories: Tuple[tuple]) -> Dict[str, Union[str, dict]]:
     activity_id, _, _, _, start, finish = activity
     start = utils.parse_datetime(start)
     finish = utils.parse_datetime(finish)

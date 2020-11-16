@@ -2,6 +2,8 @@ from aiogram import types
 
 DEFAULT_CATEGORIES = 'Работа', 'TimeKiller', 'Еда', 'Прогулка', 'Тренировка', 'Сон',
 
+WAIT_INTERVAL_FROM_USER_BEFORE_START = 10
+
 DEFAULT_INTERVAL_SECONDS = 60 * 15
 MAX_ROW_BUTTONS = 3
 
