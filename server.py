@@ -63,10 +63,7 @@ async def send_events_coro(user, session_id):
         await send_choose_categories(user, session_id, interval_seconds)
 
 
-@dp.message_handler(commands=('start',))
-async def start_session(message: types.Message):
-    user = message.from_user
-
+def get_ts_btns() -> types.ReplyKeyboardMarkup:
     btn_start = types.KeyboardButton('Старт')
     btn_stop = types.KeyboardButton('Стоп')
     btn_change_step = types.KeyboardButton('Изменить интервал')
@@ -74,6 +71,12 @@ async def start_session(message: types.Message):
 
     navigation_kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     navigation_kb.row(btn_start, btn_stop).row(btn_change_step, btn_statistic)
+    return navigation_kb
+
+
+@dp.message_handler(commands=('start',))
+async def start_session(message: types.Message):
+    user = message.from_user
 
     db.register_user_if_not_exists(user)
 
@@ -89,6 +92,8 @@ async def start_session(message: types.Message):
     first_bot_msg_time = datetime.now() + timedelta(0, interval_seconds)
     reply = msgs.FIRST_BOT_MSG.format(
         time=first_bot_msg_time.strftime("%H:%M:%S"))
+
+    navigation_kb = get_ts_btns()
     await message.answer(reply, reply_markup=navigation_kb)
 
     LOG.info('Opened session. User: ' + user.get_mention())
@@ -123,17 +128,7 @@ async def list_categories_cmd(message: types.Message):
 
 @dp.message_handler(commands=('buttons',))
 async def control_buttons_cmd(message: types.Message):
-    user = message.from_user
-
-    btn_start = types.KeyboardButton('Старт')
-    btn_stop = types.KeyboardButton('Стоп')
-    btn_change_step = types.KeyboardButton('Изменить интервал')
-    btn_statistic = types.KeyboardButton('Статистика >>')
-
-    navigation_kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    navigation_kb.row(btn_start, btn_stop).row(btn_change_step, btn_statistic)
-
-    await bot.send_message(user.id, "Отображаем кнопки", reply_markup=navigation_kb)
+    await bot.send_message(message.from_user.id, "Отображаем кнопки", reply_markup=get_ts_btns())
 
 
 async def change_interval_cmd(message: types.Message):

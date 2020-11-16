@@ -6,7 +6,7 @@ from uuid import uuid4 as uuid
 
 from aiogram import types
 from pypika import Table, SQLLiteQuery, Parameter, Order, Criterion
-# SQLLiteQuery = SQLLiteQuery
+
 from settings.config import DB_NAME, DB_MIGRATIONS_DIR, DEBUG_MODE, LOG
 from settings.constancies import DEFAULT_INTERVAL_SECONDS
 
@@ -34,12 +34,12 @@ class DBManager:
         self._cursor.close()
         self._con.close()
 
-    def _get_migration_file_paths(self):
+    def _get_migration_file_paths(self) -> List[Path]:
         migrations_dir = Path(DB_MIGRATIONS_DIR)
         migrations = sorted(migrations_dir.glob('*'))
         return migrations
 
-    def migrate(self):
+    def migrate(self) -> None:
         migration_paths = self._get_migration_file_paths()
         for migration_path in migration_paths:
             with migration_path.open('r', encoding='utf-8') as f:
@@ -59,7 +59,7 @@ class DBManager:
 
         return category
 
-    def list_categories(self, u: types.User) -> tuple:
+    def list_categories(self, u: types.User) -> Tuple[tuple]:
         """Get categories for current user"""
         # TODO: user categories
         query = SQLLiteQuery.from_(CATEGORY).select('*')
@@ -78,13 +78,13 @@ class DBManager:
 
         return db_user
 
-    def register_user_if_not_exists(self, u: types.User):
+    def register_user_if_not_exists(self, u: types.User) -> None:
         try:
             _ = self.get_user(u)
         except DoesNotExist:
             self.register_user(u)
 
-    def register_user(self, u: types.User):
+    def register_user(self, u: types.User) -> None:
         columns = 'telegram_id', 'interval_seconds', 'first_name', 'last_name', 'created_at'
         values = u.id, DEFAULT_INTERVAL_SECONDS, u.first_name, u.last_name, str(datetime.now())
         column_value_map = dict(zip(columns, values))
