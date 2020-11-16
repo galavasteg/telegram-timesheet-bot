@@ -12,11 +12,6 @@ CREATE TABLE IF NOT EXISTS category (
     name varchar(255)
 );
 
-CREATE TABLE IF NOT EXISTS default_category (
-    id integer PRIMARY KEY AUTOINCREMENT,
-    name string UNIQUE
-);
-
 CREATE TABLE IF NOT EXISTS timesheet (
     activity_id varchar(255) PRIMARY KEY,
     session_id integer,

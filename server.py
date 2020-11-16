@@ -280,9 +280,8 @@ def get_choose_categories_msg_payload(activity: tuple, categories: Tuple[tuple]
     finish = utils.parse_datetime(finish)
 
     category_btns = []
-    for category_id, name in categories:
-        data = json.dumps({'act_id': activity_id, 'cat_id': category_id},
-                          ensure_ascii=False)
+    for category_id, _, name in categories:
+        data = json.dumps({'act_id': activity_id, 'cat_id': category_id}, ensure_ascii=False)
         category_btns.append(types.InlineKeyboardButton(name, callback_data=data))
 
     buttons = split_buttons_on_rows(category_btns)
@@ -322,7 +321,7 @@ async def finish_activity(callback_query: types.CallbackQuery):
     except RuntimeError:
         reply = 'Ошибка на сервере! Как сказал инженер Чернобыльской АЭС: "...Упс"'
     else:
-        _, category_name = db.get_category(category_id)
+        _, _, category_name = db.get_category(category_id)
         reply = f'Заполнено: `{category_name}`'
 
     await bot.send_message(user.id, reply, parse_mode='Markdown')
