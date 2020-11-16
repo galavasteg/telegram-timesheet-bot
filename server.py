@@ -35,56 +35,71 @@ locks = {}
 
 
 async def get_interval(u: types.User):
-    await locks[u.id].acquire()
-    try:
+    async with locks[u.id]:
         interval_seconds = db.get_interval_seconds(u)
-        return interval_seconds
-    finally:
-        locks[u.id].release()
+    return interval_seconds
 
 
 async def set_interval(u: types.User, interval_seconds):
-    await locks[u.id].acquire()
-    try:
-        return db.set_interval_seconds(u, interval_seconds)
-    finally:
-        locks[u.id].release()
+    if u.id in locks:
+        async with locks[u.id]:
+            rows_num = db.set_interval_seconds(u, interval_seconds)
+    else:
+        db.register_user_if_not_exists(u)
+        rows_num = db.set_interval_seconds(u, interval_seconds)
+
+    return rows_num
 
 
-# TODO: message actualize
 @dp.message_handler(commands=('help',))
 async def send_welcome(message: types.Message):
-    await message.answer("Hello")#msgs.welcome)
+    await message.answer(msgs.WELCOME)
+
+
+async def send_events_coro(user, session_id):
+    while True:
+        interval_seconds = await get_interval(user)
+        await asyncio.sleep(interval_seconds)
+        await send_choose_categories(user, session_id, interval_seconds)
+
+
+def get_ts_btns() -> types.ReplyKeyboardMarkup:
+    btn_start = types.KeyboardButton('Старт')
+    btn_stop = types.KeyboardButton('Стоп')
+    btn_change_step = types.KeyboardButton('Изменить интервал')
+    btn_statistic = types.KeyboardButton('Статистика >>')
+
+    navigation_kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    navigation_kb.row(btn_start, btn_stop).row(btn_change_step, btn_statistic)
+    return navigation_kb
 
 
 @dp.message_handler(commands=('start',))
 async def start_session(message: types.Message):
     user = message.from_user
+
     db.register_user_if_not_exists(user)
 
     session_id, is_new_session = db.get_new_or_existing_session_id(user)
 
     if not is_new_session:
-        # TODO: all message tmpls to constants
-        await message.answer('Обнаружена незавершенная сессия.'
-                             ' Закройте ее ("Стоп") и начните новую ("Старт")')
+        await message.answer(msgs.CLOSE_SESSION_PLS)
         return
 
-    stop_sending_events[user.id] = asyncio.Event()
     locks[user.id] = asyncio.Lock()
-
-    stop_sending_events[user.id].clear()
     interval_seconds = await get_interval(user)
     # TODO: seconds to minutes (via datetime?)
     first_bot_msg_time = datetime.now() + timedelta(0, interval_seconds)
-    reply = f'Бот пришлет первое сообщение в {first_bot_msg_time.strftime("%H:%M")}.'
-    await message.answer(reply)
+    reply = msgs.FIRST_BOT_MSG.format(
+        time=first_bot_msg_time.strftime("%H:%M:%S"))
+
+    navigation_kb = get_ts_btns()
+    await message.answer(reply, reply_markup=navigation_kb)
 
     LOG.info('Opened session. User: ' + user.get_mention())
-    while not stop_sending_events[user.id].is_set():
-        interval_seconds = await get_interval(user)
-        await asyncio.sleep(interval_seconds)
-        await send_choose_categories(user, session_id, interval_seconds)
+
+    stop_sending_events[user.id] = asyncio.create_task(send_events_coro(user, session_id))
+    await stop_sending_events[user.id]
 
 
 @dp.message_handler(commands=('stop',))
@@ -97,7 +112,7 @@ async def stop_session(message: types.Message):
     await message.answer(reply)
 
     if stopped and user.id in stop_sending_events:
-        stop_sending_events[user.id].set()
+        stop_sending_events[user.id].cancel()
         msg = 'Closed session. User: ' + message.from_user.get_mention()
         LOG.info(msg)
 
@@ -113,20 +128,9 @@ async def list_categories_cmd(message: types.Message):
 
 @dp.message_handler(commands=('buttons',))
 async def control_buttons_cmd(message: types.Message):
-    user = message.from_user
-
-    btn_start = types.KeyboardButton('Старт')
-    btn_stop = types.KeyboardButton('Стоп')
-    btn_change_step = types.KeyboardButton('Изменить интервал')
-    btn_statistic = types.KeyboardButton('Статистика >>')
-
-    navigation_kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    navigation_kb.row(btn_start, btn_stop).row(btn_change_step, btn_statistic)
-
-    await bot.send_message(user.id, "Отображаем кнопки", reply_markup=navigation_kb)
+    await bot.send_message(message.from_user.id, "Отображаем кнопки", reply_markup=get_ts_btns())
 
 
-@dp.message_handler(commands=('step',))
 async def change_interval_cmd(message: types.Message):
     buttons = types.InlineKeyboardMarkup().row(*const.INTERVAL_BUTTONS)
     if settings.DEBUG_MODE:
@@ -151,7 +155,6 @@ async def set_replied_interval(callback_query: types.CallbackQuery):
     await bot.send_message(user.id, reply)
 
 
-@dp.message_handler(commands=('step',))
 async def stats_cmd(message: types.Message):
     await bot.send_message(message.from_user.id,
                            const.CHOOSE_STATS_TEXT,
@@ -165,7 +168,8 @@ def increment_activities_duration(acc: datetime, activity: tuple) -> datetime:
     return acc
 
 
-def calc_category_stats(category: str, activities: itertools._grouper) -> Dict[str, Union[timedelta, str, int]]:
+def calc_category_stats(category: str, activities: itertools._grouper
+                        ) -> Dict[str, Union[timedelta, str, int]]:
     time_ = functools.reduce(increment_activities_duration,
                              tuple(activities), timedelta())
     stat_repr = dict(category=category, time=time_)
@@ -179,7 +183,7 @@ def represent_stats(category_stats: Tuple[Dict[str, Union[timedelta, str, int]]]
     return stats_repr
 
 
-def calc_stats(activities: List[tuple, ...]
+def calc_stats(activities: List[tuple]
                ) -> Tuple[Dict[str, Union[str, int, float, timedelta]], ...]:
     category_filter = lambda activity: activity[-1]
     groups_gen = itertools.groupby(sorted(activities, key=category_filter),
@@ -293,10 +297,9 @@ def get_choose_categories_msg_payload(activity: tuple, categories: Tuple[tuple]
 
 
 async def send_choose_categories(u: types.User, session_id: int, interval_seconds: int):
-
-    # TODO: why not to use get_active_session
     if not db.has_active_session(u):
         return
+
     activity_id = db.start_activity(session_id, interval_seconds)
     activity = db.get_unstopped_activity(activity_id)
     categories = db.list_categories(u)

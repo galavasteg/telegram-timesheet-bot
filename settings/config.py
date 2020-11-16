@@ -23,7 +23,7 @@ TELEGRAM_API_TOKEN = getenv('TELEGRAM_API_TOKEN', '')
 assert TELEGRAM_API_TOKEN, 'TELEGRAM_API_TOKEN: Telegram bot API token not provided'
 
 MAIN_LOG_NAME = PRJ_NAME.lower()
-LOG_LEVEL = getenv('LOG_LEVEL', 'INFO')
+LOG_LEVEL = getenv('LOG_LEVEL', 'INFO').upper()
 log_conf = {
     'version': 1,
     'disable_existing_loggers': False,

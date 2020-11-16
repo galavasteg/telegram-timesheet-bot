@@ -13,5 +13,5 @@ def try_load_dotenv(directory: Union[Text, os.PathLike, None]) -> None:
 
 
 def parse_datetime(str_datetime: str) -> datetime:
-    parsed = datetime.strptime(str_datetime.rsplit(".", 1)[0], "%Y-%d-%m %H:%M:%S")
+    parsed = datetime.strptime(str_datetime.rsplit(".", 1)[0], "%Y-%m-%d %H:%M:%S")
     return parsed
