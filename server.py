@@ -1,7 +1,4 @@
-"""
-Запускаемый сервер Telegram бота
-
-"""
+"""Telegram bot server."""
 import functools
 import itertools
 import json
@@ -20,7 +17,6 @@ import utils
 import settings.constancies as const
 from database.db_manager import DBManager, DoesNotExist
 from middlewares import AccessMiddleware
-
 
 LOG = settings.LOG
 
