@@ -8,14 +8,15 @@ from aiogram import types
 from pypika import Table, SQLLiteQuery, Parameter, Order, Criterion
 
 from settings.config import DB_NAME, DB_MIGRATIONS_DIR, DEBUG_MODE, LOG
-from settings.constancies import DEFAULT_INTERVAL_SECONDS
-
+from settings.constancies import DEFAULT_INTERVAL_SECONDS, DEFAULT_CATEGORIES
 
 USER = Table('user')
-# TODO: category vs default_category, do we really need both?
-CATEGORY = Table('default_category')
+CATEGORY = Table('category')
 SESSION = Table('session')
 TIMESHEET = Table('timesheet')
+
+
+# TODO: Dataclasses for rows
 
 
 class DoesNotExist(Exception):
@@ -61,11 +62,8 @@ class DBManager:
 
     def list_categories(self, u: types.User) -> Tuple[tuple]:
         """Get categories for current user"""
-        # TODO: user categories
-        query = SQLLiteQuery.from_(CATEGORY).select('*')
-
+        query = SQLLiteQuery.from_(CATEGORY).select('*').where(CATEGORY.user_telegram_id.eq(u.id))
         categories = self._cursor.execute(query.get_sql())
-
         return tuple(categories)
 
     def get_user(self, u: types.User) -> tuple:
@@ -83,6 +81,7 @@ class DBManager:
             _ = self.get_user(u)
         except DoesNotExist:
             self.register_user(u)
+            self.create_default_categories(u)
 
     def register_user(self, u: types.User) -> None:
         columns = 'telegram_id', 'interval_seconds', 'first_name', 'last_name', 'created_at'
@@ -94,6 +93,15 @@ class DBManager:
 
         _ = self._cursor.execute(query.get_sql(), column_value_map)
         self._con.commit()
+
+    def create_default_categories(self, u: types.User) -> Tuple[Tuple[int, str]]:
+        categories = tuple((u.id, category_name) for category_name in DEFAULT_CATEGORIES)
+        query = SQLLiteQuery.into(CATEGORY).columns(CATEGORY.user_telegram_id, CATEGORY.name).insert(*categories)
+
+        _ = self._cursor.execute(query.get_sql())
+        self._con.commit()
+
+        return categories
 
     def create_session(self, u: types.User):
         columns = 'user_telegram_id', 'start_at'
@@ -149,7 +157,6 @@ class DBManager:
 
     def get_unstopped_activity(self, activity_id: str) -> tuple:
         column_value_map = {'activity_id': activity_id}
-        # TODO: refactoring, one cat table
         query = SQLLiteQuery.from_(TIMESHEET).select('*').where(
             (TIMESHEET.activity_id == Parameter(':activity_id')) &
             (TIMESHEET.default_category_id.isnull()) &

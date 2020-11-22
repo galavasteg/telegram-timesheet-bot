@@ -13,17 +13,16 @@ from utils import try_load_dotenv
 
 this_dir = Path(__file__).parent
 
-try_load_dotenv(this_dir / '.env')
-
-
 PRJ_NAME = 'CheckYourTime'
-DEBUG_MODE = getenv('DEBUG_MODE', 'false').lower() == 'true'
 
-TELEGRAM_API_TOKEN = getenv('TELEGRAM_API_TOKEN', '')
-assert TELEGRAM_API_TOKEN, 'TELEGRAM_API_TOKEN: Telegram bot API token not provided'
+try_load_dotenv(str(Path.cwd() / '.env'))
+DEBUG_MODE = getenv('DEBUG_MODE', 'false').lower() == 'true'
+LOG_LEVEL = getenv('LOG_LEVEL', 'INFO').upper()
+TELEGRAM_API_TOKEN = getenv('TELEGRAM_API_TOKEN')
+
+assert TELEGRAM_API_TOKEN, 'TELEGRAM_API_TOKEN not provided.'
 
 MAIN_LOG_NAME = PRJ_NAME.lower()
-LOG_LEVEL = getenv('LOG_LEVEL', 'INFO').upper()
 log_conf = {
     'version': 1,
     'disable_existing_loggers': False,

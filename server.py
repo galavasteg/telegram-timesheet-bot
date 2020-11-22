@@ -1,7 +1,4 @@
-"""
-Запускаемый сервер Telegram бота
-
-"""
+"""Telegram bot server."""
 import functools
 import itertools
 import json
@@ -20,7 +17,6 @@ import utils
 import settings.constancies as const
 from database.db_manager import DBManager, DoesNotExist
 from middlewares import AccessMiddleware
-
 
 LOG = settings.LOG
 
@@ -86,6 +82,12 @@ async def start_session(message: types.Message):
         await message.answer(msgs.CLOSE_SESSION_PLS)
         return
 
+    await message.answer('У вас есть {wait_for_sec} секунд, чтобы выбрать интервал на эту сессию.'.format(
+        wait_for_sec=const.WAIT_INTERVAL_FROM_USER_BEFORE_START
+    ))
+    await change_interval_cmd(message)
+    await asyncio.sleep(const.WAIT_INTERVAL_FROM_USER_BEFORE_START)
+
     locks[user.id] = asyncio.Lock()
     interval_seconds = await get_interval(user)
     # TODO: seconds to minutes (via datetime?)
@@ -136,9 +138,7 @@ async def change_interval_cmd(message: types.Message):
     if settings.DEBUG_MODE:
         buttons.row(*const.DEBUG_BUTTONS)
 
-    await bot.send_message(message.from_user.id,
-                           const.CHOOSE_INTERVAL_TEXT,
-                           reply_markup=buttons)
+    await bot.send_message(message.from_user.id, const.CHOOSE_INTERVAL_TEXT, reply_markup=buttons)
 
 
 @dp.callback_query_handler(lambda c: c.message.text == const.CHOOSE_INTERVAL_TEXT)
@@ -215,16 +215,13 @@ def get_stats(u: types.User, period: Union[Dict[str, int], str]) -> str:
         stat_period = f'последнюю сессию'
 
     session_ids = tuple(session[0] for session in sessions)
-    try:
-        activities = db.get_timesheet_frame_by_sessions(session_ids)
-    except DoesNotExist:
-        stats_repr = 'Вы не зафиксировали ни одной активности.'
-    else:
-        # TODO: other representations
-        stats = calc_stats(activities)
-        stats_repr = represent_stats(stats)
-        stats_repr = f'{msg_title}\n`{stats_repr}`'
-        stats_repr = stats_repr.format(stat_period=stat_period)
+    activities = db.get_timesheet_frame_by_sessions(session_ids)
+
+    # TODO: other representations
+    stats = calc_stats(activities)
+    stats_repr = represent_stats(stats)
+    stats_repr = f'{msg_title}\n`{stats_repr}`'
+    stats_repr = stats_repr.format(stat_period=stat_period)
 
     return stats_repr
 
@@ -238,8 +235,13 @@ async def get_requested_stats(callback_query: types.CallbackQuery):
     except ValueError:
         stats_period = callback_query.data
 
-    stats = get_stats(user, stats_period)
-    reply = stats
+    try:
+        stats = get_stats(user, stats_period)
+    except DoesNotExist:
+        reply = 'За данный период ничего не найдено!'
+
+    else:
+        reply = stats
 
     await bot.send_message(user.id, reply, parse_mode="Markdown")
 
@@ -273,16 +275,14 @@ def split_buttons_on_rows(btns: Iterable[types.InlineKeyboardButton]
     return buttons
 
 
-def get_choose_categories_msg_payload(activity: tuple, categories: Tuple[tuple]
-                                      ) -> Dict[str, Union[str, dict]]:
+def get_choose_categories_msg_payload(activity: tuple, categories: Tuple[tuple]) -> Dict[str, Union[str, dict]]:
     activity_id, _, _, _, start, finish = activity
     start = utils.parse_datetime(start)
     finish = utils.parse_datetime(finish)
 
     category_btns = []
-    for category_id, name in categories:
-        data = json.dumps({'act_id': activity_id, 'cat_id': category_id},
-                          ensure_ascii=False)
+    for category_id, _, name in categories:
+        data = json.dumps({'act_id': activity_id, 'cat_id': category_id}, ensure_ascii=False)
         category_btns.append(types.InlineKeyboardButton(name, callback_data=data))
 
     buttons = split_buttons_on_rows(category_btns)
@@ -322,7 +322,7 @@ async def finish_activity(callback_query: types.CallbackQuery):
     except RuntimeError:
         reply = 'Ошибка на сервере! Как сказал инженер Чернобыльской АЭС: "...Упс"'
     else:
-        _, category_name = db.get_category(category_id)
+        _, _, category_name = db.get_category(category_id)
         reply = f'Заполнено: `{category_name}`'
 
     await bot.send_message(user.id, reply, parse_mode='Markdown')
