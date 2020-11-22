@@ -157,7 +157,6 @@ class DBManager:
 
     def get_unstopped_activity(self, activity_id: str) -> tuple:
         column_value_map = {'activity_id': activity_id}
-        # TODO: refactoring, one cat table
         query = SQLLiteQuery.from_(TIMESHEET).select('*').where(
             (TIMESHEET.activity_id == Parameter(':activity_id')) &
             (TIMESHEET.default_category_id.isnull()) &

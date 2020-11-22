@@ -101,11 +101,12 @@ LOG_LEVEL = info
 - use 'click' in manage.py (create it)
 - create services.py for business logic, 'application' directory for other stuff
 - configure everything: logger, db conn pool, sync, etc. - in manage.py
+- tests =)
 - messages refactoring
 - EN readme
-- tests =)
 - migrate to postgresql and use 'asyncpg'
 - docker-compose.yaml
+- critical and error logs on email (env)
 
 ### features
 - ask user set interval before start new session
