@@ -51,6 +51,7 @@ ACCESS_IDS_FILE = white_list_of_tg_accounts
 `ACCESS_IDS_FILE` — Путь к файлу со списком ID Telegram аккаунтов, от которых будут приниматься
 сообщения (сообщения от остальных аккаунтов игнорируются).
 Если файл содержит пустой список, то будут обрабатываться сообщения от всех пользователей. Формат файла:
+
 ```
 # allowed_accounts.json
 [
@@ -60,12 +61,13 @@ ACCESS_IDS_FILE = white_list_of_tg_accounts
 ]
 ```
 
-Дополнительные переменные окружения:
+Дополнительные переменные окружения (капсом выделены значения по-умолчанию):
 ```
-# 'false' by default
-DEBUG_MODE = true|false
-# 'info' by default
-LOG_LEVEL = debug|info|error|critical
+# Hежим "дебаг", при котором исключения будут логироваться с трейсбэком,
+#  и появятся дополнительные кнопки выбора периодов для ускорения ручного тестирования. 
+DEBUG_MODE = true|FALSE
+# Уровень логирования.
+LOG_LEVEL = debug|INFO|error|critical
 ```
 
 ### 3.2. Read '.env' file
@@ -82,10 +84,13 @@ LOG_LEVEL = info
 
 
 ## 4. Database
-Используется файловая СУБД SQLite3.
+Используется файловая СУБД SQLite3. Войти в SQL шелл:
+
+```bash
+sqlite3 /home/db/finance.db
+```
 
 В будущем планируется использование postgresql и библиотеки `asyncpg`, т.к. само приложение асинхронное.
-
 
 ## TODO
 ### bugfix
@@ -99,6 +104,7 @@ LOG_LEVEL = info
 - use 'click' in manage.py (create it)
 - create services.py for business logic, 'application' directory for other stuff
 - configure everything: logger, db conn pool, sync, etc. - in manage.py
+- DB README: create/migrate, shell.
 - tests =)
 - messages refactoring
 - EN readme
