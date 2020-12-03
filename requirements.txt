@@ -1,15 +1,6 @@
-aiogram==2.10.1
-aiohttp==3.6.2
-async-timeout==3.0.1
-attrs==19.3.0
-Babel==2.7.0
-certifi==2019.11.28
-chardet==3.0.4
-idna==2.8
-more-itertools==8.5.0
-multidict==4.7.6
-PyPika==0.42.1
-python-dotenv==0.14.0
-pytz==2019.3
-yarl==1.4.2
-python-dateutil==2.8.1
+aiogram         >=2.11.2, <3
+
+envparse        >=0.2.0, <1
+more-itertools  >=8.6.0, <9
+PyPika          >=0.44.0, <1
+python-dateutil >=2.8.1, <3
