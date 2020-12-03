@@ -100,7 +100,6 @@ sqlite3 /home/db/finance.db
 ### refactoring
 - Bot Version.
 - linter [wemake-python-styleguide](https://wemake-python-stylegui.de/en/latest/)
-- Makefile for installation and running
 - use 'click' in manage.py (create it)
 - create services.py for business logic, 'application' directory for other stuff
 - configure everything: logger, db conn pool, sync, etc. - in manage.py
