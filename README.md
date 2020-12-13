@@ -100,9 +100,6 @@ sqlite3 /home/db/finance.db
 ### refactoring
 - Bot Version.
 - linter [wemake-python-styleguide](https://wemake-python-stylegui.de/en/latest/)
-- use 'click' in manage.py (create it)
-- create services.py for business logic, 'application' directory for other stuff
-- configure everything: logger, db conn pool, sync, etc. - in manage.py
 - DB README: create/migrate, shell.
 - tests =)
 - messages refactoring
@@ -113,6 +110,7 @@ sqlite3 /home/db/finance.db
 
 ### features
 - ask user set interval before start new session
+    - bug: stop session before first bot message - message received from bot anyway
 - notify user about not completed activities
 - adding user's custom categories
 - on/off user categories
