@@ -1,8 +1,3 @@
-"""
-Read ENVs (parse .env file if "python-dotenv" installed),
-prepare logger.
-
-"""
 import json
 import logging.config
 from pathlib import Path
@@ -13,8 +8,6 @@ from .log_formatter import JSONFormatter
 
 
 this_dir = Path(__file__).parent
-
-PRJ_NAME = 'CheckYourTime'
 
 env = Env()
 env.read_envfile()
@@ -32,37 +25,3 @@ with access_ids_file.open(encoding='utf-8') as f:
 
 DB_NAME = 'database/timesheet.db'
 DB_MIGRATIONS_DIR = 'database/migrations'
-
-MAIN_LOG_NAME = PRJ_NAME.lower()
-log_conf = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'json': {
-            '()': JSONFormatter,
-            'jsondumps_kwargs': {
-                'ensure_ascii': False,
-                # 'indent': 2,
-            }
-        }
-    },
-    'handlers': {
-        'json2console': {
-          'class': 'logging.StreamHandler',
-          'level': LOG_LEVEL,
-          'formatter': 'json',
-          'stream': 'ext://sys.stdout'
-        },
-    },
-    'loggers': {
-        MAIN_LOG_NAME: {
-            'level': LOG_LEVEL,
-            'handlers': [
-                'json2console',
-            ],
-            'propagate': False,
-        },
-    }
-}
-logging.config.dictConfig(log_conf)
-LOG = logging.getLogger(MAIN_LOG_NAME)

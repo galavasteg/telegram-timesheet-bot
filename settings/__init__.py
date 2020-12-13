@@ -1,7 +1,7 @@
-from settings.config import (
-    LOG,
-    MAIN_LOG_NAME,
+from . import constancies
+from .config import (
     ACCESS_IDS,
-    TELEGRAM_API_TOKEN,
     DEBUG_MODE,
+    TELEGRAM_API_TOKEN,
 )
+from .logs import LOG_CONFIG

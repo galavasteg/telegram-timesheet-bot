@@ -4,6 +4,7 @@ import itertools
 import json
 import asyncio
 from datetime import datetime, timedelta
+from logging import getLogger
 from typing import Dict, Union, Tuple, Iterable, List
 
 from aiogram import Bot, Dispatcher, executor
@@ -18,7 +19,8 @@ import settings.constancies as const
 from database.db_manager import DBManager, DoesNotExist
 from middlewares import AccessMiddleware
 
-LOG = settings.LOG
+
+log = getLogger(__name__)
 
 db = DBManager()
 
@@ -98,7 +100,7 @@ async def start_session(message: types.Message):
     navigation_kb = get_ts_btns()
     await message.answer(reply, reply_markup=navigation_kb)
 
-    LOG.info('Opened session. User: ' + user.get_mention())
+    log.info('Opened session. User: ' + user.get_mention())
 
     stop_sending_events[user.id] = asyncio.create_task(send_events_coro(user, session_id))
     await stop_sending_events[user.id]
@@ -116,7 +118,7 @@ async def stop_session(message: types.Message):
     if stopped and user.id in stop_sending_events:
         stop_sending_events[user.id].cancel()
         msg = 'Closed session. User: ' + message.from_user.get_mention()
-        LOG.info(msg)
+        log.info(msg)
 
 
 @dp.message_handler(commands=('list',))
