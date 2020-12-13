@@ -5,6 +5,8 @@ import click
 from aiogram.utils import executor
 
 from settings import LOG_CONFIG
+from timesheetbot.db_manager import DBManager
+from timesheetbot.server import dp
 
 
 @click.group()
@@ -15,10 +17,14 @@ def cli():
         import uvloop
         uvloop.install()
 
+    database = DBManager()
+    database.migrate()
+
 
 @cli.command(short_help='start bot')
 def start():
     """Start the bot."""
+    executor.start_polling(dp, skip_updates=True)
 
 
 if __name__ == '__main__':

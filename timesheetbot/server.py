@@ -7,20 +7,20 @@ from datetime import datetime, timedelta
 from logging import getLogger
 from typing import Dict, Union, Tuple, Iterable, List
 
-from aiogram import Bot, Dispatcher, executor
+from aiogram import Bot, Dispatcher
 from aiogram import types
 from dateutil.relativedelta import relativedelta
 import more_itertools
 
 import settings
-import messages as msgs
-import utils
-import settings.constancies as const
-from database.db_manager import DBManager, DoesNotExist
-from middlewares import AccessMiddleware
+from . import utils, messages as msgs
+from .db_manager import DBManager, DoesNotExist
+from .middlewares import AccessMiddleware
 
 
 log = getLogger(__name__)
+
+const = settings.constancies
 
 db = DBManager()
 
@@ -331,5 +331,7 @@ async def finish_activity(callback_query: types.CallbackQuery):
 
 
 if __name__ == '__main__':
+    from aiogram.utils import executor
+
     db.migrate()
     executor.start_polling(dp, skip_updates=True)
