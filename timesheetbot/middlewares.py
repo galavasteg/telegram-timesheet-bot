@@ -17,7 +17,7 @@ class AccessMiddleware(BaseMiddleware):
         self._access_ids = set(map(int, user_id_white_list))
 
     async def on_process_message(self, message: types.Message, _) -> None:
-        access_denied = self.access_ids and int(message.from_user.id) not in self.access_ids
+        access_denied = self._access_ids and int(message.from_user.id) not in self._access_ids
         if access_denied:
             await message.answer("Access Denied")
             raise CancelHandler()
