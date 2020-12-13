@@ -1,10 +1,7 @@
 import json
-import logging.config
 from pathlib import Path
 
 from envparse import Env
-
-from .log_formatter import JSONFormatter
 
 
 this_dir = Path(__file__).parent
