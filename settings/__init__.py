@@ -1,4 +1,4 @@
-from . import constancies
+from . import constants
 from .config import (
     ACCESS_IDS,
     DEBUG_MODE,

@@ -1,6 +1,0 @@
--r requirements.txt
-
-# LINTER
-wemake-python-styleguide    >=0.14.1, <1
-dotenv-linter               >=0.1.5, <1
-pre-commit                  >=2.9.0, <3
