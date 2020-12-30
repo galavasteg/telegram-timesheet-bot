@@ -1,5 +1,6 @@
 import sqlite3
 from datetime import datetime, timedelta
+from logging import getLogger
 from pathlib import Path
 from typing import Tuple, List
 from uuid import uuid4 as uuid
@@ -7,8 +8,11 @@ from uuid import uuid4 as uuid
 from aiogram import types
 from pypika import Table, SQLLiteQuery, Parameter, Order, Criterion
 
-from settings.config import DB_NAME, DB_MIGRATIONS_DIR, DEBUG_MODE, LOG
-from settings.constancies import DEFAULT_INTERVAL_SECONDS, DEFAULT_CATEGORIES
+from settings.config import DB_NAME, DB_MIGRATIONS_DIR, DEBUG_MODE
+from settings import constants
+
+
+log = getLogger(__name__)
 
 USER = Table('user')
 CATEGORY = Table('category')
@@ -28,7 +32,7 @@ class DBManager:
     def __init__(self):
         self._con = sqlite3.Connection(DB_NAME)
         if DEBUG_MODE:
-            self._con.set_trace_callback(LOG.debug)
+            self._con.set_trace_callback(log.debug)
         self._cursor = self._con.cursor()
 
     def __del__(self):
@@ -85,7 +89,7 @@ class DBManager:
 
     def register_user(self, u: types.User) -> None:
         columns = 'telegram_id', 'interval_seconds', 'first_name', 'last_name', 'created_at'
-        values = u.id, DEFAULT_INTERVAL_SECONDS, u.first_name, u.last_name, str(datetime.now())
+        values = u.id, constants.DEFAULT_INTERVAL_SECONDS, u.first_name, u.last_name, str(datetime.now())
         column_value_map = dict(zip(columns, values))
         params = map(lambda col: f':{col}', columns)
         query = SQLLiteQuery.into(USER).columns(*columns).insert(
@@ -95,7 +99,7 @@ class DBManager:
         self._con.commit()
 
     def create_default_categories(self, u: types.User) -> Tuple[Tuple[int, str]]:
-        categories = tuple((u.id, category_name) for category_name in DEFAULT_CATEGORIES)
+        categories = tuple((u.id, category_name) for category_name in constants.DEFAULT_CATEGORIES)
         query = SQLLiteQuery.into(CATEGORY).columns(CATEGORY.user_telegram_id, CATEGORY.name).insert(*categories)
 
         _ = self._cursor.execute(query.get_sql())

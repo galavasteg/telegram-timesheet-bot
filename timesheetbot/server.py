@@ -3,22 +3,26 @@ import functools
 import itertools
 import json
 import asyncio
+import operator
+from collections import defaultdict
 from datetime import datetime, timedelta
+from logging import getLogger
 from typing import Dict, Union, Tuple, Iterable, List
 
-from aiogram import Bot, Dispatcher, executor
+from aiogram import Bot, Dispatcher
 from aiogram import types
 from dateutil.relativedelta import relativedelta
 import more_itertools
 
 import settings
-import messages as msgs
-import utils
-import settings.constancies as const
-from database.db_manager import DBManager, DoesNotExist
-from middlewares import AccessMiddleware
+from . import utils, messages as msgs
+from .db_manager import DBManager, DoesNotExist
+from .middlewares import AccessMiddleware
 
-LOG = settings.LOG
+
+log = getLogger(__name__)
+
+const = settings.constants
 
 db = DBManager()
 
@@ -26,7 +30,8 @@ bot = Bot(token=settings.TELEGRAM_API_TOKEN)
 dp = Dispatcher(bot)
 dp.middleware.setup(AccessMiddleware(settings.ACCESS_IDS))
 
-stop_sending_events = {}
+stop_sending_events = defaultdict(lambda: [])
+user_start_interval_waiters = defaultdict(lambda: [])
 locks = {}
 
 
@@ -86,7 +91,13 @@ async def start_session(message: types.Message):
         wait_for_sec=const.WAIT_INTERVAL_FROM_USER_BEFORE_START
     ))
     await change_interval_cmd(message)
-    await asyncio.sleep(const.WAIT_INTERVAL_FROM_USER_BEFORE_START)
+
+    sleep = asyncio.create_task(asyncio.sleep(const.WAIT_INTERVAL_FROM_USER_BEFORE_START))
+    user_start_interval_waiters[user.id].append(sleep)
+    try:
+        await sleep
+    except asyncio.CancelledError as exc:
+        pass
 
     locks[user.id] = asyncio.Lock()
     interval_seconds = await get_interval(user)
@@ -98,10 +109,11 @@ async def start_session(message: types.Message):
     navigation_kb = get_ts_btns()
     await message.answer(reply, reply_markup=navigation_kb)
 
-    LOG.info('Opened session. User: ' + user.get_mention())
+    log.info('Opened session. User: ' + user.get_mention())
 
-    stop_sending_events[user.id] = asyncio.create_task(send_events_coro(user, session_id))
-    await stop_sending_events[user.id]
+    task = asyncio.create_task(send_events_coro(user, session_id))
+    stop_sending_events[user.id].append(task)
+    await task
 
 
 @dp.message_handler(commands=('stop',))
@@ -114,9 +126,9 @@ async def stop_session(message: types.Message):
     await message.answer(reply)
 
     if stopped and user.id in stop_sending_events:
-        stop_sending_events[user.id].cancel()
+        [task.cancel() for task in stop_sending_events[user.id]]
         msg = 'Closed session. User: ' + message.from_user.get_mention()
-        LOG.info(msg)
+        log.info(msg)
 
 
 @dp.message_handler(commands=('list',))
@@ -148,6 +160,7 @@ async def set_replied_interval(callback_query: types.CallbackQuery):
     interval_seconds = int(callback_query.data)
 
     _ = await set_interval(user, interval_seconds)
+    [task.cancel() for task in user_start_interval_waiters[user.id]]
 
     # TODO: seconds to minutes (via datetime?)
     interval_representation = f'{interval_seconds} секунд'
@@ -329,5 +342,7 @@ async def finish_activity(callback_query: types.CallbackQuery):
 
 
 if __name__ == '__main__':
+    from aiogram.utils import executor
+
     db.migrate()
     executor.start_polling(dp, skip_updates=True)
