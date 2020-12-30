@@ -3,6 +3,8 @@ import functools
 import itertools
 import json
 import asyncio
+import operator
+from collections import defaultdict
 from datetime import datetime, timedelta
 from logging import getLogger
 from typing import Dict, Union, Tuple, Iterable, List
@@ -20,7 +22,7 @@ from .middlewares import AccessMiddleware
 
 log = getLogger(__name__)
 
-const = settings.constancies
+const = settings.constants
 
 db = DBManager()
 
@@ -28,7 +30,8 @@ bot = Bot(token=settings.TELEGRAM_API_TOKEN)
 dp = Dispatcher(bot)
 dp.middleware.setup(AccessMiddleware(settings.ACCESS_IDS))
 
-stop_sending_events = {}
+stop_sending_events = defaultdict(lambda: [])
+user_start_interval_waiters = defaultdict(lambda: [])
 locks = {}
 
 
@@ -88,7 +91,13 @@ async def start_session(message: types.Message):
         wait_for_sec=const.WAIT_INTERVAL_FROM_USER_BEFORE_START
     ))
     await change_interval_cmd(message)
-    await asyncio.sleep(const.WAIT_INTERVAL_FROM_USER_BEFORE_START)
+
+    sleep = asyncio.create_task(asyncio.sleep(const.WAIT_INTERVAL_FROM_USER_BEFORE_START))
+    user_start_interval_waiters[user.id].append(sleep)
+    try:
+        await sleep
+    except asyncio.CancelledError as exc:
+        pass
 
     locks[user.id] = asyncio.Lock()
     interval_seconds = await get_interval(user)
@@ -102,8 +111,9 @@ async def start_session(message: types.Message):
 
     log.info('Opened session. User: ' + user.get_mention())
 
-    stop_sending_events[user.id] = asyncio.create_task(send_events_coro(user, session_id))
-    await stop_sending_events[user.id]
+    task = asyncio.create_task(send_events_coro(user, session_id))
+    stop_sending_events[user.id].append(task)
+    await task
 
 
 @dp.message_handler(commands=('stop',))
@@ -116,7 +126,7 @@ async def stop_session(message: types.Message):
     await message.answer(reply)
 
     if stopped and user.id in stop_sending_events:
-        stop_sending_events[user.id].cancel()
+        [task.cancel() for task in stop_sending_events[user.id]]
         msg = 'Closed session. User: ' + message.from_user.get_mention()
         log.info(msg)
 
@@ -150,6 +160,7 @@ async def set_replied_interval(callback_query: types.CallbackQuery):
     interval_seconds = int(callback_query.data)
 
     _ = await set_interval(user, interval_seconds)
+    [task.cancel() for task in user_start_interval_waiters[user.id]]
 
     # TODO: seconds to minutes (via datetime?)
     interval_representation = f'{interval_seconds} секунд'

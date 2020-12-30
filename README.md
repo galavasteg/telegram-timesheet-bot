@@ -109,8 +109,6 @@ sqlite3 /home/db/finance.db
 - critical and error logs on email (env)
 
 ### features
-- ask user set interval before start new session
-    - bug: stop session before first bot message - message received from bot anyway
 - notify user about not completed activities
 - adding user's custom categories
 - on/off user categories
