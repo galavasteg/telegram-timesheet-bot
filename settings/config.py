@@ -21,4 +21,4 @@ with access_ids_file.open(encoding='utf-8') as f:
     ACCESS_IDS = set(json.load(f))
 
 DB_NAME = 'database/timesheet.db'
-DB_MIGRATIONS_DIR = 'database/migrations'
+DB_MIGRATIONS_DIR = 'migrations'

@@ -269,3 +269,20 @@ class DBManager:
             raise DoesNotExist()
 
         return sessions_frame
+
+    def get_user_unfilled_activities(self, u: types.User) -> List[tuple]:
+        query = '''
+            select a.*
+            from timesheet a
+                join session s on s.id = a.session_id
+                    -- and s.category_id = :user_id
+                    and s.user_telegram_id = :user_id
+            where default_category_id is null
+        '''
+
+        unfilled_activities = self._cursor.execute(query, {'user_id': u.id}).fetchall()
+
+        if not unfilled_activities:
+            raise DoesNotExist()
+
+        return unfilled_activities

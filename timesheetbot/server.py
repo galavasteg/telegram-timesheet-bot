@@ -35,6 +35,9 @@ user_start_interval_waiters = defaultdict(lambda: [])
 locks = {}
 
 
+class FoundUnfilledActivity(BaseException): ...
+
+
 async def get_interval(u: types.User):
     async with locks[u.id]:
         interval_seconds = db.get_interval_seconds(u)
@@ -81,6 +84,8 @@ async def start_session(message: types.Message):
 
     db.register_user_if_not_exists(user)
 
+    await check_activities_filled(user)
+
     session_id, is_new_session = db.get_new_or_existing_session_id(user)
 
     if not is_new_session:
@@ -114,6 +119,17 @@ async def start_session(message: types.Message):
     task = asyncio.create_task(send_events_coro(user, session_id))
     stop_sending_events[user.id].append(task)
     await task
+
+
+async def check_activities_filled(u):
+    try:
+        activities = db.get_user_unfilled_activities(u)
+    except DoesNotExist:
+        return True
+    else:
+        log.error(str(activities))
+        raise FoundUnfilledActivity
+
 
 
 @dp.message_handler(commands=('stop',))
