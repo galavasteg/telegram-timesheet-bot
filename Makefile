@@ -1,7 +1,10 @@
-install: # install dependencies
-    python -m pip install --upgrade pip setuptools
-    python -m pip install -r dev-requirements.txt
+install-prod: # Install only production dependencies
+	python -m pip install --upgrade pip setuptools
+	python -m pip install -Ur requirements.prod.txt
 
-flake: # TODO: requires: install
-    python -m flake8
+install: # Install all dependencies (tests, linter, plugins)
+	python -m pip install --upgrade pip setuptools
+	python -m pip install -Ur requirements.dev.txt
 
+flake:
+	python -m flake8
