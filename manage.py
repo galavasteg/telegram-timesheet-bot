@@ -17,13 +17,15 @@ def cli():
         import uvloop
         uvloop.install()
 
+
+@cli.command(short_help='apply db migrations')
+def migrate():
     database = DBManager()
     database.migrate()
 
 
 @cli.command(short_help='start bot')
 def start():
-    """Start the bot."""
     executor.start_polling(dp, skip_updates=True)
 
 

@@ -3,7 +3,6 @@ import functools
 import itertools
 import json
 import asyncio
-import operator
 from collections import defaultdict
 from datetime import datetime, timedelta
 from logging import getLogger
@@ -171,23 +170,25 @@ async def change_interval_cmd(message: types.Message):
 
 @dp.callback_query_handler(lambda c: c.message.text == const.CHOOSE_INTERVAL_TEXT)
 async def set_replied_interval(callback_query: types.CallbackQuery):
-    await bot.answer_callback_query(callback_query.id)
     user = callback_query.from_user
     interval_seconds = int(callback_query.data)
 
     _ = await set_interval(user, interval_seconds)
     [task.cancel() for task in user_start_interval_waiters[user.id]]
 
-    # TODO: seconds to minutes (via datetime?)
-    interval_representation = f'{interval_seconds} секунд'
-    reply = 'Установлен интервал: {}'.format(interval_representation)
-    await bot.send_message(user.id, reply)
+    await bot.answer_callback_query(
+        callback_query_id=callback_query.id,
+        show_alert=False,
+        text=f'Установлен интервал: {timedelta(seconds=interval_seconds)}',
+    )
 
 
 async def stats_cmd(message: types.Message):
-    await bot.send_message(message.from_user.id,
-                           const.CHOOSE_STATS_TEXT,
-                           reply_markup=const.STATS_BUTTONS)
+    await bot.send_message(
+        message.from_user.id,
+        const.CHOOSE_STATS_TEXT,
+        reply_markup=const.STATS_BUTTONS,
+    )
 
 
 def increment_activities_duration(acc: datetime, activity: tuple) -> datetime:
