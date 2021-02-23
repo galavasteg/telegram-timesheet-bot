@@ -10,7 +10,7 @@ from pypika import Table, SQLLiteQuery, Parameter, Order, Criterion
 
 from settings.config import DB_NAME, DB_MIGRATIONS_DIR, DEBUG_MODE
 from settings import constants
-
+from timesheetbot.utils import parse_datetime
 
 log = getLogger(__name__)
 
@@ -131,7 +131,7 @@ class DBManager:
         else:
             return existing_session[0], False
 
-    def get_last_started_session(self, u: types.User) -> int:
+    def get_last_started_session(self, u: types.User) -> Tuple:
         query = SQLLiteQuery().from_(SESSION).select('*') \
             .where(SESSION.user_telegram_id.eq(Parameter(':user_id'))) \
             .orderby(SESSION.start_at, order=Order.desc) \
@@ -142,6 +142,7 @@ class DBManager:
         if not session:
             raise DoesNotExist()
 
+        session = (*session[:-2], *map(parse_datetime, session[-2:]))
         return session
 
     def try_stop_session(self, u: types.User) -> bool:
@@ -154,9 +155,9 @@ class DBManager:
         else:
             session_id, *_ = opened_session
             query = SQLLiteQuery.update(SESSION) \
-                .set(SESSION.stop_at, datetime.now()) \
+                .set(SESSION.stop_at, Parameter(':stop_at')) \
                 .where(SESSION.id.eq(session_id))
-            self._cursor.execute(query.get_sql())
+            self._cursor.execute(query.get_sql(), {'stop_at': datetime.now()})
             self._con.commit()
             return True
 

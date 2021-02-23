@@ -10,10 +10,12 @@ from typing import Dict, Union, Tuple, Iterable, List
 
 from aiogram import Bot, Dispatcher
 from aiogram import types
+from aiogram.types import InputFile
 from dateutil.relativedelta import relativedelta
 import more_itertools
 
 import settings
+from timesheetbot.services.report import generate_report
 from . import utils, messages as msgs
 from .db_manager import DBManager, DoesNotExist
 from .middlewares import AccessMiddleware
@@ -35,6 +37,7 @@ locks = {}
 
 
 class FoundUnfilledActivity(BaseException): ...
+class WrongStatPeriod(BaseException): ...
 
 
 async def get_interval(u: types.User):
@@ -233,8 +236,9 @@ def calc_stats(activities: List[tuple]
     return category_stats
 
 
-def get_stats(u: types.User, period: Union[Dict[str, int], str]) -> str:
+def get_stats(u: types.User, period: Union[Dict[str, int], str]) -> Tuple[str, Tuple[datetime, datetime]]:
     t1 = datetime.now()
+    t1 -= timedelta(microseconds=t1.microsecond)
     msg_title = 'За {stat_period} ваша статистика следующая:'
 
     if isinstance(period, dict):
@@ -246,7 +250,10 @@ def get_stats(u: types.User, period: Union[Dict[str, int], str]) -> str:
         stat_period = f'{utils.parse_datetime(str(t0))} - {utils.parse_datetime(str(t1))}'
     elif period == 'session':
         sessions = (db.get_last_started_session(u),)
+        t0 = sessions[0][-2]
         stat_period = f'последнюю сессию'
+    else:
+        raise WrongStatPeriod()
 
     session_ids = tuple(session[0] for session in sessions)
     activities = db.get_timesheet_frame_by_sessions(session_ids)
@@ -257,7 +264,7 @@ def get_stats(u: types.User, period: Union[Dict[str, int], str]) -> str:
     stats_repr = f'{msg_title}\n`{stats_repr}`'
     stats_repr = stats_repr.format(stat_period=stat_period)
 
-    return stats_repr
+    return stats_repr, (t0, t1)
 
 
 @dp.callback_query_handler(lambda c: c.message.text == const.CHOOSE_STATS_TEXT)
@@ -271,15 +278,22 @@ async def get_requested_stats(callback_query: types.CallbackQuery):
     except ValueError:
         stats_period = callback_query.data
 
+    send_file_task = []
     try:
-        stats = get_stats(user, stats_period)
+        stats, (t0, t1) = get_stats(user, stats_period)
     except DoesNotExist:
-        reply = 'За данный период ничего не найдено!'
+        text = 'За данный период ничего не найдено!'
     else:
-        reply = stats
+        text = stats
+        filename = f'ts_{t0:%Y%m%dT%H%M%S}_{t1:%Y%m%dT%H%M%S}.xlsx'
+        report_file = InputFile(generate_report((t0, t1)), filename=filename)
+        send_file_task = [bot.send_document(request_message.chat.id, report_file)]
 
-    await request_message.edit_reply_markup()
-    await request_message.edit_text(reply, parse_mode="Markdown")
+    async def edit_request_msg():
+        await request_message.edit_reply_markup()
+        await request_message.edit_text(text, parse_mode="Markdown")
+
+    await asyncio.gather(edit_request_msg(), *send_file_task)
 
 
 def split_buttons_on_rows(btns: Iterable[types.InlineKeyboardButton]
