@@ -1,3 +1,4 @@
+-- TODO Real keys -> postgres, migrations with rollback
 CREATE TABLE IF NOT EXISTS user (
     telegram_id integer PRIMARY KEY,
     interval_seconds integer,

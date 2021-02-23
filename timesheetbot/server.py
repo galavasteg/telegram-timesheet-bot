@@ -78,6 +78,7 @@ def get_ts_btns() -> types.ReplyKeyboardMarkup:
 
 
 @dp.message_handler(commands=('start',))
+@dp.message_handler(lambda msg: msg.text.lower() in ('start', 'старт'))
 async def start_session(message: types.Message):
     user = message.from_user
 
@@ -91,7 +92,7 @@ async def start_session(message: types.Message):
         await message.answer(msgs.CLOSE_SESSION_PLS)
         return
 
-    await message.answer('У вас есть {wait_for_sec} секунд, чтобы выбрать интервал на эту сессию.'.format(
+    await message.answer('У вас есть {wait_for_sec:d} секунд, чтобы выбрать интервал на эту сессию.'.format(
         wait_for_sec=const.WAIT_INTERVAL_FROM_USER_BEFORE_START
     ))
     await change_interval_cmd(message)
@@ -132,6 +133,7 @@ async def check_activities_filled(u):
 
 
 @dp.message_handler(commands=('stop',))
+@dp.message_handler(lambda msg: msg.text.lower() in ('stop', 'стоп'))
 async def stop_session(message: types.Message):
     user = message.from_user
 
@@ -160,6 +162,7 @@ async def control_buttons_cmd(message: types.Message):
     await bot.send_message(message.from_user.id, "Отображаем кнопки", reply_markup=get_ts_btns())
 
 
+@dp.message_handler(lambda msg: msg.text.lower() in ('change interval', 'изменить интервал'))
 async def change_interval_cmd(message: types.Message):
     buttons = types.InlineKeyboardMarkup().row(*const.INTERVAL_BUTTONS)
     if settings.DEBUG_MODE:
@@ -183,6 +186,7 @@ async def set_replied_interval(callback_query: types.CallbackQuery):
     )
 
 
+@dp.message_handler(lambda msg: msg.text.lower() in ('statistic >>', 'статистика >>'))
 async def stats_cmd(message: types.Message):
     await bot.send_message(
         message.from_user.id,
@@ -240,7 +244,7 @@ def get_stats(u: types.User, period: Union[Dict[str, int], str]) -> str:
             t0 = t1 - timedelta(**period)
         sessions = db.filter_user_sessions_by_start(u, t0)
         stat_period = f'{utils.parse_datetime(str(t0))} - {utils.parse_datetime(str(t1))}'
-    else:  # period == 'session':
+    elif period == 'session':
         sessions = (db.get_last_started_session(u),)
         stat_period = f'последнюю сессию'
 
@@ -258,6 +262,8 @@ def get_stats(u: types.User, period: Union[Dict[str, int], str]) -> str:
 
 @dp.callback_query_handler(lambda c: c.message.text == const.CHOOSE_STATS_TEXT)
 async def get_requested_stats(callback_query: types.CallbackQuery):
+    request_message = callback_query.message
+
     await bot.answer_callback_query(callback_query.id)
     user = callback_query.from_user
     try:
@@ -269,31 +275,11 @@ async def get_requested_stats(callback_query: types.CallbackQuery):
         stats = get_stats(user, stats_period)
     except DoesNotExist:
         reply = 'За данный период ничего не найдено!'
-
     else:
         reply = stats
 
-    await bot.send_message(user.id, reply, parse_mode="Markdown")
-
-
-BTNNAME_HANDLER_MAP = {
-    'Старт': start_session,
-    'Стоп': stop_session,
-    'Изменить интервал': change_interval_cmd,
-    'Статистика >>': stats_cmd,
-}
-
-
-@dp.message_handler(content_types=types.ContentTypes.ANY)
-async def reply_admin_btns(message: types.Message):
-    btn_name = message.text
-
-    if btn_name not in BTNNAME_HANDLER_MAP:
-        await message.answer(f'`{btn_name}` не реализован')
-    else:
-
-        handler = BTNNAME_HANDLER_MAP[btn_name]
-        await handler(message)
+    await request_message.edit_reply_markup()
+    await request_message.edit_text(reply, parse_mode="Markdown")
 
 
 def split_buttons_on_rows(btns: Iterable[types.InlineKeyboardButton]
@@ -342,20 +328,21 @@ async def send_choose_categories(u: types.User, session_id: int, interval_second
 async def finish_activity(callback_query: types.CallbackQuery):
     await bot.answer_callback_query(callback_query.id)
     data = json.loads(callback_query.data)
-    user = callback_query.from_user
+    request_message = callback_query.message
 
     try:
         activity_id, category_id = data['act_id'], data['cat_id']
         db.stop_activity(activity_id, category_id)
     except DoesNotExist:
-        reply = 'Промежуток уже был заполнен'
+        reply = '\n'.join((request_message.text, 'Промежуток уже был заполнен'))
     except RuntimeError:
-        reply = 'Ошибка на сервере! Как сказал инженер Чернобыльской АЭС: "...Упс"'
+        reply = '\n'.join((request_message.text, 'Ошибка на сервере! Как сказал инженер Чернобыльской АЭС: "...Упс"'))
     else:
         _, _, category_name = db.get_category(category_id)
-        reply = f'Заполнено: `{category_name}`'
+        reply = '\n'.join((request_message.text, f'Заполнено: `{category_name}`'))
 
-    await bot.send_message(user.id, reply, parse_mode='Markdown')
+    await request_message.edit_reply_markup()
+    await request_message.edit_text(reply, parse_mode="Markdown")
 
 
 if __name__ == '__main__':

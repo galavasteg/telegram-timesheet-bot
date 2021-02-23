@@ -27,6 +27,7 @@ class DoesNotExist(Exception):
     """Exception for empty DB-response."""
 
 
+# TODO: postgres, db pool + pypika
 class DBManager:
 
     def __init__(self):
