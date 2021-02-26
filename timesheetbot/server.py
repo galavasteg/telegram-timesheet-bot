@@ -15,8 +15,7 @@ from dateutil.relativedelta import relativedelta
 import more_itertools
 
 import settings
-from settings import TELEGRAM_API_TOKEN
-from settings.config import ACCESS_IDS_FILE
+from settings import TELEGRAM_API_TOKEN, ACCESS_IDS_FILE, DEBUG_MODE, SITE_URL
 from timesheetbot.services.report import generate_report
 from . import utils, messages as msgs
 from .db_manager import DBManager, DoesNotExist
@@ -31,6 +30,8 @@ db = DBManager()
 
 assert TELEGRAM_API_TOKEN, 'TELEGRAM_API_TOKEN not provided.'
 bot = Bot(token=TELEGRAM_API_TOKEN)
+if not DEBUG_MODE:
+    bot.set_webhook(f'{SITE_URL}/{TELEGRAM_API_TOKEN}', max_connections=1)
 dp = Dispatcher(bot)
 
 assert ACCESS_IDS_FILE.exists(), f'No such file: {ACCESS_IDS_FILE=}'
