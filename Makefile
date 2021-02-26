@@ -8,3 +8,9 @@ install: # Install all dependencies (tests, linter, plugins)
 
 flake:
 	python -m flake8
+
+run:
+	python manage.py start
+
+db:
+	python manage.py migrate

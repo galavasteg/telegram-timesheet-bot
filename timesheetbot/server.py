@@ -15,6 +15,8 @@ from dateutil.relativedelta import relativedelta
 import more_itertools
 
 import settings
+from settings import TELEGRAM_API_TOKEN
+from settings.config import ACCESS_IDS_FILE
 from timesheetbot.services.report import generate_report
 from . import utils, messages as msgs
 from .db_manager import DBManager, DoesNotExist
@@ -27,9 +29,14 @@ const = settings.constants
 
 db = DBManager()
 
-bot = Bot(token=settings.TELEGRAM_API_TOKEN)
+assert TELEGRAM_API_TOKEN, 'TELEGRAM_API_TOKEN not provided.'
+bot = Bot(token=TELEGRAM_API_TOKEN)
 dp = Dispatcher(bot)
-dp.middleware.setup(AccessMiddleware(settings.ACCESS_IDS))
+
+assert ACCESS_IDS_FILE.exists(), f'No such file: {ACCESS_IDS_FILE=}'
+with ACCESS_IDS_FILE.open(encoding='utf-8') as f:
+    ACCESS_IDS = set(json.load(f))
+dp.middleware.setup(AccessMiddleware(ACCESS_IDS))
 
 stop_sending_events = defaultdict(lambda: [])
 user_start_interval_waiters = defaultdict(lambda: [])
