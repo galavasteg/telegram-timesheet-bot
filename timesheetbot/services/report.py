@@ -12,11 +12,12 @@ TIME_STEP_INITIAL_ROW = 2
 
 
 def generate_report(
-    date_range: Tuple[datetime, datetime],
+    time_range: Tuple[datetime, datetime],
+    session_ids: Tuple[int, ...],
     report_time_step_minutes: int = DEFAULT_TIME_STEP_MINUTES,
 ) -> BytesIO:
     wb = create_report_book(report_time_step_minutes)
-    fill_report(wb, date_range)
+    fill_report(wb, time_range, session_ids)
 
     virtual_wb = BytesIO()
     wb.save(virtual_wb)
@@ -27,7 +28,6 @@ def generate_report(
 def create_report_book(time_step_minutes: int = DEFAULT_TIME_STEP_MINUTES) -> Workbook:
     report_row_cnt = ceil(timedelta(1) / timedelta(minutes=time_step_minutes))
     wb = Workbook(iso_dates=True)
-    wb.save('tmp/report.xlsx')
     ws = wb['Sheet']
 
     time_value, row = datetime.utcfromtimestamp(0), TIME_STEP_INITIAL_ROW
@@ -39,7 +39,7 @@ def create_report_book(time_step_minutes: int = DEFAULT_TIME_STEP_MINUTES) -> Wo
     return wb
 
 
-def fill_report(wb: Workbook, date_range: Tuple[datetime, datetime]):
+def fill_report(wb: Workbook, time_range: Tuple[datetime, datetime], session_ids: Tuple[int]):
     wb['Sheet'].title = 'Timesheet'
     # TODO
 

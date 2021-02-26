@@ -236,7 +236,7 @@ def calc_stats(activities: List[tuple]
     return category_stats
 
 
-def get_stats(u: types.User, period: Union[Dict[str, int], str]) -> Tuple[str, Tuple[datetime, datetime]]:
+def get_stats(u: types.User, period: Union[Dict[str, int], str]) -> Tuple[str, Tuple[datetime, datetime], Tuple[int]]:
     t1 = datetime.now()
     t1 -= timedelta(microseconds=t1.microsecond)
     msg_title = 'За {stat_period} ваша статистика следующая:'
@@ -264,7 +264,7 @@ def get_stats(u: types.User, period: Union[Dict[str, int], str]) -> Tuple[str, T
     stats_repr = f'{msg_title}\n`{stats_repr}`'
     stats_repr = stats_repr.format(stat_period=stat_period)
 
-    return stats_repr, (t0, t1)
+    return stats_repr, (t0, t1), session_ids
 
 
 @dp.callback_query_handler(lambda c: c.message.text == const.CHOOSE_STATS_TEXT)
@@ -280,13 +280,13 @@ async def get_requested_stats(callback_query: types.CallbackQuery):
 
     send_file_task = []
     try:
-        stats, (t0, t1) = get_stats(user, stats_period)
+        stats, (t0, t1), session_ids = get_stats(user, stats_period)
     except DoesNotExist:
         text = 'За данный период ничего не найдено!'
     else:
         text = stats
         filename = f'ts_{t0:%Y%m%dT%H%M%S}_{t1:%Y%m%dT%H%M%S}.xlsx'
-        report_file = InputFile(generate_report((t0, t1)), filename=filename)
+        report_file = InputFile(generate_report((t0, t1), session_ids), filename=filename)
         send_file_task = [bot.send_document(request_message.chat.id, report_file)]
 
     async def edit_request_msg():
