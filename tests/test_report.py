@@ -8,15 +8,15 @@ from timesheetbot.services.report import get_report_dates, get_longest_frame_cat
 cases = (
     (
         (datetime(2021, 2, 2, 15, 30), datetime(2021, 2, 2, 16, 30)),
-        (date(2021, 2, 2),),
+        (datetime(2021, 2, 2),),
     ),
     (
         (datetime(2021, 2, 2, 15, 30), datetime(2021, 2, 5, 16, 30)),
-        (date(2021, 2, 2), date(2021, 2, 3), date(2021, 2, 4), date(2021, 2, 5)),
+        (datetime(2021, 2, 2), datetime(2021, 2, 3), datetime(2021, 2, 4), datetime(2021, 2, 5)),
     ),
     (
         (datetime(2021, 2, 2, 15, 30), datetime(2021, 2, 3, 9)),
-        (date(2021, 2, 2), date(2021, 2, 3)),
+        (datetime(2021, 2, 2), datetime(2021, 2, 3)),
     )
 )
 
