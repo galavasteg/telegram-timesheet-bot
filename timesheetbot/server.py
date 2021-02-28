@@ -182,16 +182,18 @@ async def change_interval_cmd(message: types.Message):
 
 @dp.callback_query_handler(lambda c: c.message.text == const.CHOOSE_INTERVAL_TEXT)
 async def set_replied_interval(callback_query: types.CallbackQuery):
+    request_message = callback_query.message
     user = callback_query.from_user
     interval_seconds = int(callback_query.data)
 
     _ = await set_interval(user, interval_seconds)
     [task.cancel() for task in user_start_interval_waiters[user.id]]
 
-    await bot.answer_callback_query(
-        callback_query_id=callback_query.id,
-        show_alert=False,
-        text=f'Установлен интервал: {timedelta(seconds=interval_seconds)}',
+    # todo: interactive edit markup
+    await request_message.edit_reply_markup()
+    interval_repr = ':'.join(str(timedelta(seconds=interval_seconds)).split(':')[1:])  # %M:%S
+    await request_message.edit_text(
+        request_message.text + f'\nУстановлен интервал (мм:сс): {interval_repr} .'
     )
 
 
