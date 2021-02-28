@@ -142,7 +142,7 @@ class DBManager:
         if not session:
             raise DoesNotExist()
 
-        session = (*session[:-2], *map(parse_datetime, session[-2:]))
+        session = (*session[:-2], *map(parse_datetime, session[-2:-1]), session[-1])
         return session
 
     def try_stop_session(self, u: types.User) -> bool:

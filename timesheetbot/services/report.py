@@ -1,16 +1,20 @@
 import itertools
+from collections import defaultdict
 from datetime import datetime, timedelta, date, time
+from functools import partial
 from io import BytesIO
 from math import ceil
-from typing import Tuple, List, Generator
+from typing import Tuple, List, Generator, Iterable
 
 from openpyxl import Workbook
 
 from timesheetbot import utils
 
+
 DEFAULT_TIME_STEP_MINUTES = 30
 TIME_INITIAL_ROW = 2
 DATE_INITIAL_COL = 2
+cut_time = partial(datetime.replace, hour=0, minute=0, second=0, microsecond=0)
 
 
 def generate_report(
@@ -23,21 +27,50 @@ def generate_report(
     ws = wb['Timesheet']
     actvts = prepare_activities(time_range, activities)
 
-    times = get_report_times(time_step_minutes)
-    for row, time_val in enumerate(times, TIME_INITIAL_ROW):
-        ws.cell(column=1, row=row, value=str(time_val))
-
     for col, (date_val, activity_gr) in enumerate(
-        itertools.groupby(actvts, key=lambda a: a[-3].date()), DATE_INITIAL_COL
+        itertools.groupby(actvts, key=lambda a: cut_time(a[-3])), DATE_INITIAL_COL
     ):
+        times = get_report_times(time_step_minutes, init_date_value=date_val)
         # TODO fix +1 date for week (other periods ?)
+        # fill date of statistic time frame (1-st row)
         wb['Timesheet'].cell(column=col, row=1, value=str(date_val))
 
-        # TODO fill in activities
-        # for row, time_val in enumerate(times, TIME_INITIAL_ROW):
-        #     ws.cell(column=col, row=row, value=str(time_val))
+        activities = tuple(activity_gr)
+        for row, time_frame in enumerate(zip(times, times[1:]), TIME_INITIAL_ROW):
+            if col == DATE_INITIAL_COL:
+                # fill time frames (1-st column)
+                ws.cell(column=1, row=row, value='-'.join(map(lambda t: datetime.strftime(t, '%H:%M'), time_frame)))
+
+            # fill in activities
+            category_name = get_longest_frame_category(activities, time_frame)
+            ws.cell(column=col, row=row, value=category_name)
 
     return _report_to_virt_file(wb)
+
+
+def get_longest_frame_category(activities: Iterable, time_frame: Tuple[datetime, datetime]) -> str:
+    t0, t1 = time_frame
+    get_category_name = lambda activity: activity[-1]
+    get_frame_activity = lambda activity: any(t0 <= a_t <= t1 for a_t in activity[-3:-1])
+
+    def iter_category_duration() -> Generator[Tuple[str, timedelta], None, None]:
+        for activity in activities:
+            if not (category := get_category_name(activity)) or not get_frame_activity(activity):
+                continue
+
+            if activity[-3] < t0 < activity[-2]:
+                yield category, activity[-2] - t0
+            elif all(t0 <= a_t <= t1 for a_t in activity[-3:-1]):
+                yield category, activity[-2] - activity[-3]
+            elif activity[-3] < t1 <= activity[-2]:
+                yield category, t1 - activity[-3]
+                break
+
+    category_frame_duration = defaultdict(lambda: timedelta(0))
+    for cat, dur in iter_category_duration():
+        category_frame_duration[cat] += dur
+
+    return max(category_frame_duration, key=category_frame_duration.get, default='')
 
 
 def prepare_activities(time_range, activities) -> tuple:
@@ -52,26 +85,19 @@ def prepare_activities(time_range, activities) -> tuple:
     return tuple(activities)
 
 
-def get_report_dates(time_range: Tuple[datetime, datetime]) -> Generator[date, None, None]:
+def get_report_dates(time_range: Tuple[datetime, datetime]) -> Generator[datetime, None, None]:
     assert time_range[0] < time_range[1]
-    d0, d1 = map(datetime.date, time_range)
+    d0, d1 = map(cut_time, time_range)
     days_cnt = ceil((d1 - d0) / timedelta(1)) + 1
     for delta_days in range(days_cnt):
         yield d0 + timedelta(delta_days)
 
 
-def get_report_times(time_step_minutes: int) -> Tuple[time, ...]:
+def get_report_times(time_step_minutes: int, init_date_value: datetime) -> Tuple[datetime, ...]:
     report_row_cnt = ceil(timedelta(1) / timedelta(minutes=time_step_minutes))
     time_step = timedelta(minutes=time_step_minutes)
-
-    # todo: tests, accumulate
-    time_value = datetime.utcfromtimestamp(0)
-    times = [time_value.time()]
-    for row in range(report_row_cnt):
-        time_value += time_step
-        times.append(time_value.time())
-
-    return tuple(times)
+    times = tuple(itertools.accumulate(range(report_row_cnt), lambda tm, _: tm + time_step, initial=init_date_value))
+    return times
 
 
 def _report_to_virt_file(wb: Workbook):
