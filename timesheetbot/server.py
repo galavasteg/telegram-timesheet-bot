@@ -29,11 +29,7 @@ const = settings.constants
 db = DBManager()
 
 assert TELEGRAM_API_TOKEN, 'TELEGRAM_API_TOKEN not provided.'
-bot = Bot(token=TELEGRAM_API_TOKEN, proxy=None if DEBUG_MODE else 'http://proxy.server:3128')
-if not DEBUG_MODE:
-    asyncio.get_event_loop().run_until_complete(
-        bot.set_webhook(f'{SITE_URL}/{TELEGRAM_API_TOKEN}', max_connections=1)
-    )
+bot = Bot(token=TELEGRAM_API_TOKEN)
 dp = Dispatcher(bot)
 
 assert ACCESS_IDS_FILE.exists(), f'No such file: {ACCESS_IDS_FILE=}'
