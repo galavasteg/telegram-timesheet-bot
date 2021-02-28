@@ -1,19 +1,22 @@
 import itertools
 from collections import defaultdict
-from datetime import datetime, timedelta, date, time
+from datetime import datetime, timedelta, time
 from functools import partial
 from io import BytesIO
 from math import ceil
 from typing import Tuple, List, Generator, Iterable
 
 from openpyxl import Workbook
+from openpyxl.styles import PatternFill
+from openpyxl.utils import get_column_letter
 
 from timesheetbot import utils
-
 
 DEFAULT_TIME_STEP_MINUTES = 30
 TIME_INITIAL_ROW = 2
 DATE_INITIAL_COL = 2
+DATE_COLUMN_WIDTH = len('2021-01-01')
+TIME_COLUMN_WIDTH = len('00:00-00:30')
 cut_time = partial(datetime.replace, hour=0, minute=0, second=0, microsecond=0)
 
 
@@ -25,25 +28,31 @@ def generate_report(
     wb = Workbook(iso_dates=True)
     wb['Sheet'].title = 'Timesheet'
     ws = wb['Timesheet']
+    ws.freeze_panes = "B2"
     actvts = prepare_activities(time_range, activities)
 
     for col, (date_val, activity_gr) in enumerate(
         itertools.groupby(actvts, key=lambda a: cut_time(a[-3])), DATE_INITIAL_COL
     ):
         times = get_report_times(time_step_minutes, init_date_value=date_val)
-        # TODO fix +1 date for week (other periods ?)
         # fill date of statistic time frame (1-st row)
-        wb['Timesheet'].cell(column=col, row=1, value=str(date_val))
+        wb['Timesheet'].cell(column=col, row=1, value=str(date_val.date()))
+        ws.column_dimensions[get_column_letter(col)].width = DATE_COLUMN_WIDTH
 
         activities = tuple(activity_gr)
         for row, time_frame in enumerate(zip(times, times[1:]), TIME_INITIAL_ROW):
             if col == DATE_INITIAL_COL:
                 # fill time frames (1-st column)
                 ws.cell(column=1, row=row, value='-'.join(map(lambda t: datetime.strftime(t, '%H:%M'), time_frame)))
+                ws.column_dimensions[get_column_letter(1)].width = TIME_COLUMN_WIDTH
+
+            category_cell = ws.cell(column=col, row=row)
+            if time_frame[1] < time_range[0] or time_range[1] < time_frame[0]:
+                # set color for cells out of time_range
+                category_cell.fill = PatternFill(start_color="D3D3D3", end_color="D3D3D3", fill_type="solid")
 
             # fill in activities
-            category_name = get_longest_frame_category(activities, time_frame)
-            ws.cell(column=col, row=row, value=category_name)
+            category_cell.value = get_longest_frame_category(activities, time_frame)
 
     return _report_to_virt_file(wb)
 
