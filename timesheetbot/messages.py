@@ -1,5 +1,7 @@
 from typing import Dict
 
+from settings.constants import DEFAULT_INTERVAL_MINUTES
+
 _base_cmds = {
     'help': 'вывести это сообщение',
     'list': 'список текущих категорий',
@@ -36,7 +38,7 @@ _base_cmds_s = _represent_commands(_base_cmds)
 WELCOME = (
     'Бот для учёта времени.\n'
     'Вы можете настроить временной интервал'
-    ' (по умолчанию, 15 мин), с которым бот'
+    f' (по умолчанию, {DEFAULT_INTERVAL_MINUTES:d} мин), с которым бот'
     ' будет вас опрашивать.\n\n'
     
     'Чтобы начать нажмите: /start\n\n'
@@ -47,5 +49,4 @@ WELCOME = (
 
 FIRST_BOT_MSG = 'Бот пришлет первое сообщение в {time}.'
 
-CLOSE_SESSION_PLS = 'Обнаружена незавершенная сессия.' \
-                    ' Закройте ее ("Стоп") и начните новую ("Старт")'
+CLOSE_SESSION_PLS = 'Обнаружена незавершенная сессия. [Закройте](/stop) ее и [начните](/start) новую.'

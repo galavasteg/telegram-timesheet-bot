@@ -140,7 +140,6 @@ async def check_activities_filled(u):
         raise FoundUnfilledActivity
 
 
-
 @dp.message_handler(commands=('stop',))
 @dp.message_handler(lambda msg: msg.text.lower() in ('stop', 'стоп'))
 async def stop_session(message: types.Message):
@@ -191,7 +190,8 @@ async def set_replied_interval(callback_query: types.CallbackQuery):
     await request_message.edit_reply_markup()
     interval_repr = ':'.join(str(timedelta(seconds=interval_seconds)).split(':')[1:])  # %M:%S
     await request_message.edit_text(
-        request_message.text + f'\nУстановлен интервал (мм:сс): {interval_repr} .'
+        request_message.text + f'\nУстановлен интервал (мм:сс): `{interval_repr}` .',
+        parse_mode='Markdown',
     )
 
 
