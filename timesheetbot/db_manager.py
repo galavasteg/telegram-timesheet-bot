@@ -245,7 +245,7 @@ class DBManager:
         SELECT ts.*, cat.name
         FROM {TIMESHEET} ts
         JOIN {CATEGORY} cat ON ts.default_category_id is not null AND ts.default_category_id = cat.id
-        WHERE ts.session_id in {session_ids}
+        WHERE ts.session_id in ({','.join(map(str, session_ids))})
         ORDER BY ts.start
         """
 
