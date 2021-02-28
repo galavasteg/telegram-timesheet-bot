@@ -223,7 +223,7 @@ def calc_category_stats(category: str, activities: itertools._grouper
     return stat_repr
 
 
-def represent_stats(category_stats: Tuple[Dict[str, Union[timedelta, str, int]]],) -> str:
+def represent_stats(category_stats: Tuple[Dict[str, Union[timedelta, str, float, int]]]) -> str:
     category_stat_template = '{category:<15} {time} ({percent:.2f}%)'
     stats_repr = '\n'.join(category_stat_template.format(**stats)
                            for stats in category_stats)
@@ -246,7 +246,7 @@ def calc_stats(activities: List[tuple]
     return category_stats
 
 
-def get_stats(u: types.User, period: Union[Dict[str, int], str]) -> Tuple[str, Tuple[datetime, datetime], Tuple[int]]:
+def get_stats(u: types.User, period: Union[Dict[str, int], str]) -> Tuple[str, Tuple[datetime, datetime], List[tuple]]:
     t1 = datetime.now()
     t1 -= timedelta(microseconds=t1.microsecond)
     msg_title = 'За {stat_period} ваша статистика следующая:'
@@ -274,7 +274,7 @@ def get_stats(u: types.User, period: Union[Dict[str, int], str]) -> Tuple[str, T
     stats_repr = f'{msg_title}\n`{stats_repr}`'
     stats_repr = stats_repr.format(stat_period=stat_period)
 
-    return stats_repr, (t0, t1), session_ids
+    return stats_repr, (t0, t1), activities
 
 
 @dp.callback_query_handler(lambda c: c.message.text == const.CHOOSE_STATS_TEXT)
@@ -290,13 +290,14 @@ async def get_requested_stats(callback_query: types.CallbackQuery):
 
     send_file_task = []
     try:
-        stats, (t0, t1), session_ids = get_stats(user, stats_period)
+        stats, (t0, t1), activities = get_stats(user, stats_period)
     except DoesNotExist:
         text = 'За данный период ничего не найдено!'
     else:
         text = stats
-        filename = f'ts_{t0:%Y%m%dT%H%M%S}_{t1:%Y%m%dT%H%M%S}.xlsx'
-        report_file = InputFile(generate_report((t0, t1), session_ids), filename=filename)
+        report = generate_report((t0, t1), activities)
+        filename = f'ts-stats-{t0:%Y%m%dT%H%M%S}-{t1:%Y%m%dT%H%M%S}.xlsx'
+        report_file = InputFile(report, filename=filename)
         send_file_task = [bot.send_document(request_message.chat.id, report_file)]
 
     async def edit_request_msg():

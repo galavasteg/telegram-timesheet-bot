@@ -241,16 +241,13 @@ class DBManager:
         if not session_ids:
             raise DoesNotExist()
 
-        query = SQLLiteQuery().from_(TIMESHEET) \
-            .inner_join(CATEGORY).on(Criterion.all((
-                TIMESHEET.default_category_id.notnull(),
-                TIMESHEET.default_category_id.eq(CATEGORY.id),
-            ))) \
-            .select(
-                TIMESHEET.star,
-                # (TIMESHEET.finish - TIMESHEET.start).as_('activity_duration'),  # datetime in sqlite in str
-                CATEGORY.name) \
-            .where(TIMESHEET.session_id.isin(session_ids)).get_sql()
+        query = f"""
+        SELECT ts.*, cat.name
+        FROM {TIMESHEET} ts
+        JOIN {CATEGORY} cat ON ts.default_category_id is not null AND ts.default_category_id = cat.id
+        WHERE ts.session_id in {session_ids}
+        ORDER BY ts.start
+        """
 
         timesheet_frame = self._cursor.execute(query).fetchall()
 
