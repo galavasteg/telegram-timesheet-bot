@@ -160,10 +160,8 @@ async def stop_session(message: types.Message):
 @dp.message_handler(commands=('list',))
 async def list_categories_cmd(message: types.Message):
     user = message.from_user
-    categories = db.list_categories(user)
-    msg = 'Категории:\n\n{}'.format(
-            '\n'.join(name for _, name in categories))
-    await message.answer(msg)
+    categories_repr = "\n".join(name for *_, name in db.list_categories(user))
+    await message.answer(f'Категории:\n`{categories_repr}`', parse_mode='Markdown')
 
 
 @dp.message_handler(commands=('buttons',))
@@ -247,7 +245,7 @@ def calc_stats(activities: List[tuple]
 def get_stats(u: types.User, period: Union[Dict[str, int], str]) -> Tuple[str, Tuple[datetime, datetime], List[tuple]]:
     t1 = datetime.now()
     t1 -= timedelta(microseconds=t1.microsecond)
-    msg_title = 'За {stat_period} ваша статистика следующая:'
+    msg_title = 'За `{stat_period}` ваша статистика следующая:'
 
     if isinstance(period, dict):
         if 'months' in period:
