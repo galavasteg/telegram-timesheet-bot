@@ -222,7 +222,7 @@ def calc_category_stats(category: str, activities: itertools._grouper
 def represent_stats(category_stats: Tuple[Dict[str, Union[timedelta, str, float, int]]]) -> str:
     category_stat_template = '{category:<15} {time} ({percent:.2f}%)'
     stats_repr = '\n'.join(category_stat_template.format(**stats)
-                           for stats in category_stats)
+                           for stats in sorted(category_stats, key=lambda stat: stat['percent'], reverse=True))
     return stats_repr
 
 
