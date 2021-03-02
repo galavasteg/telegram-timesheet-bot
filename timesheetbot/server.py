@@ -93,7 +93,12 @@ async def start_session(message: types.Message):
 
     db.register_user_if_not_exists(user)
 
-    await check_activities_filled(user)
+    try:
+        await check_activities_filled(user)
+    except FoundUnfilledActivity as exc:
+        await bot.send_message(user.id, 'Заполните все предыдущие активности!')
+        log.error('%s: `%s`', user.get_mention(), type(exc).__name__)
+        return
 
     session_id, is_new_session = db.get_new_or_existing_session_id(user)
 
@@ -165,7 +170,7 @@ async def list_categories_cmd(message: types.Message):
 
 @dp.message_handler(commands=('buttons',))
 async def control_buttons_cmd(message: types.Message):
-    await bot.send_message(message.from_user.id, "Отображаем кнопки", reply_markup=get_ts_btns())
+    await bot.send_message(message.from_user.id, '', reply_markup=get_ts_btns())
 
 
 @dp.message_handler(lambda msg: msg.text.lower() in ('change interval', 'изменить интервал'))
