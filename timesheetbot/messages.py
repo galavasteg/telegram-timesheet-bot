@@ -37,8 +37,7 @@ _base_cmds_s = _represent_commands(_base_cmds)
 # TODO: add link on description article
 WELCOME = (
     'Бот для учёта времени.\n'
-    'Вы можете настроить временной интервал'
-    f' (по умолчанию, {DEFAULT_INTERVAL_MINUTES:d} мин), с которым бот'
+    'Вы можете настроить временной интервал (по умолчанию, {DEFAULT_INTERVAL_MINUTES:d} мин), с которым бот'
     ' будет вас опрашивать.\n\n'
     
     'Чтобы начать нажмите: /start\n\n'
@@ -49,4 +48,4 @@ WELCOME = (
 
 FIRST_BOT_MSG = 'Бот пришлет первое сообщение в {time}.'
 
-CLOSE_SESSION_PLS = 'Обнаружена незавершенная сессия. [Закройте](/stop) ее и [начните](/start) новую.'
+CLOSE_SESSION_PLS = 'Обнаружена незавершенная сессия. /stop ее и /start новую.'

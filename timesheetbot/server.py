@@ -15,16 +15,16 @@ from dateutil.relativedelta import relativedelta
 import more_itertools
 
 import settings
-from settings import TELEGRAM_API_TOKEN, ACCESS_IDS_FILE, DEBUG_MODE, SITE_URL
+from settings import TELEGRAM_API_TOKEN, ACCESS_IDS_FILE
+from settings import constants as const
 from timesheetbot.services.report import generate_report
+from timesheetbot.utils import mm_ss_representation
 from . import utils, messages as msgs
 from .db_manager import DBManager, DoesNotExist
 from .middlewares import AccessMiddleware
 
 
 log = getLogger(__name__)
-
-const = settings.constants
 
 db = DBManager()
 
@@ -42,25 +42,26 @@ user_start_interval_waiters = defaultdict(lambda: [])
 locks = {}
 
 
+# todo: errors description
 class FoundUnfilledActivity(BaseException): ...
 class WrongStatPeriod(BaseException): ...
 
 
 async def get_interval(u: types.User):
-    async with locks[u.id]:
-        interval_seconds = db.get_interval_seconds(u)
-    return interval_seconds
+    if user_lock := locks.get(u.id):
+        async with user_lock:
+            return db.get_interval_seconds(u)
+    else:
+        return db.get_interval_seconds(u)
 
 
-async def set_interval(u: types.User, interval_seconds):
-    if u.id in locks:
-        async with locks[u.id]:
-            rows_num = db.set_interval_seconds(u, interval_seconds)
+async def set_interval(u: types.User, interval_seconds: int):
+    if user_lock := locks.get(u.id):
+        async with user_lock:
+            db.set_interval_seconds(u, interval_seconds)
     else:
         db.register_user_if_not_exists(u)
-        rows_num = db.set_interval_seconds(u, interval_seconds)
-
-    return rows_num
+        db.set_interval_seconds(u, interval_seconds)
 
 
 @dp.message_handler(commands=('help',))
@@ -73,17 +74,6 @@ async def send_events_coro(user, session_id):
         interval_seconds = await get_interval(user)
         await asyncio.sleep(interval_seconds)
         await send_choose_categories(user, session_id, interval_seconds)
-
-
-def get_ts_btns() -> types.ReplyKeyboardMarkup:
-    btn_start = types.KeyboardButton('Старт')
-    btn_stop = types.KeyboardButton('Стоп')
-    btn_change_step = types.KeyboardButton('Изменить интервал')
-    btn_statistic = types.KeyboardButton('Статистика >>')
-
-    navigation_kb = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-    navigation_kb.row(btn_start, btn_stop).row(btn_change_step, btn_statistic)
-    return navigation_kb
 
 
 @dp.message_handler(commands=('start',))
@@ -106,9 +96,12 @@ async def start_session(message: types.Message):
         await message.answer(msgs.CLOSE_SESSION_PLS)
         return
 
-    await message.answer('У вас есть {wait_for_sec:d} секунд, чтобы выбрать интервал на эту сессию.'.format(
-        wait_for_sec=const.WAIT_INTERVAL_FROM_USER_BEFORE_START
-    ))
+    interval_seconds = await get_interval(user)
+    await message.answer(
+        f'Ваш текущий интервал (мм:сс): {mm_ss_representation(interval_seconds)}\n'
+        f'У вас есть `{const.WAIT_INTERVAL_FROM_USER_BEFORE_START:d} секунд`, чтобы начать сессию с другим интервалом.',
+        parse_mode='Markdown'
+    )
     await change_interval_cmd(message)
 
     sleep = asyncio.create_task(asyncio.sleep(const.WAIT_INTERVAL_FROM_USER_BEFORE_START))
@@ -121,17 +114,15 @@ async def start_session(message: types.Message):
     locks[user.id] = asyncio.Lock()
     interval_seconds = await get_interval(user)
     # TODO: seconds to minutes (via datetime?)
-    first_bot_msg_time = datetime.now() + timedelta(0, interval_seconds)
-    reply = msgs.FIRST_BOT_MSG.format(
-        time=first_bot_msg_time.strftime("%H:%M:%S"))
+    first_bot_msg_time = datetime.now() + timedelta(0, seconds=interval_seconds)
+    reply = msgs.FIRST_BOT_MSG.format(time=first_bot_msg_time.strftime("%H:%M:%S"))
 
-    navigation_kb = get_ts_btns()
-    await message.answer(reply, reply_markup=navigation_kb)
-
-    log.info('Opened session. User: %s', user.get_mention())
+    await message.answer(reply, reply_markup=const.NAVIGATION_KB)
 
     task = asyncio.create_task(send_events_coro(user, session_id))
     stop_sending_events[user.id].append(task)
+
+    log.info('Opened session. User: %s', user.get_mention())
     await task
 
 
@@ -140,6 +131,7 @@ async def check_activities_filled(u):
         activities = db.get_user_unfilled_activities(u)
     except DoesNotExist:
         return True
+
     else:
         log.error(str(activities))
         raise FoundUnfilledActivity
@@ -155,8 +147,8 @@ async def stop_session(message: types.Message):
 
     await message.answer(reply)
 
-    if stopped and user.id in stop_sending_events:
-        [task.cancel() for task in stop_sending_events[user.id]]
+    if stopped and (sending_events := stop_sending_events.pop(user.id, [])):
+        [task.cancel() for task in sending_events]
         msg = 'Closed session. User: ' + message.from_user.get_mention()
         log.info(msg)
 
@@ -170,9 +162,10 @@ async def list_categories_cmd(message: types.Message):
 
 @dp.message_handler(commands=('buttons',))
 async def control_buttons_cmd(message: types.Message):
-    await bot.send_message(message.from_user.id, '', reply_markup=get_ts_btns())
+    await bot.send_message(message.from_user.id, '', reply_markup=const.NAVIGATION_KB)
 
 
+@dp.message_handler(commands=('step',))
 @dp.message_handler(lambda msg: msg.text.lower() in ('change interval', 'изменить интервал'))
 async def change_interval_cmd(message: types.Message):
     buttons = types.InlineKeyboardMarkup().row(*const.INTERVAL_BUTTONS)
@@ -193,7 +186,7 @@ async def set_replied_interval(callback_query: types.CallbackQuery):
 
     # todo: interactive edit markup
     await request_message.edit_reply_markup()
-    interval_repr = ':'.join(str(timedelta(seconds=interval_seconds)).split(':')[1:])  # %M:%S
+    interval_repr = mm_ss_representation(interval_seconds)  # %M:%S
     await request_message.edit_text(
         request_message.text + f'\nУстановлен интервал (мм:сс): `{interval_repr}` .',
         parse_mode='Markdown',

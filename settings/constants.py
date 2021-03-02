@@ -8,7 +8,12 @@ DEFAULT_INTERVAL_MINUTES = 15
 DEFAULT_INTERVAL_SECONDS = 60 * DEFAULT_INTERVAL_MINUTES
 MAX_ROW_BUTTONS = 3
 
-START_SESSION_BEFOREHAND = 'Сперва стартуй сессию'
+NAVIGATION_KB = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2).row(
+    types.KeyboardButton('Старт'), types.KeyboardButton('Стоп'),
+).row(
+    types.KeyboardButton('Изменить интервал'), types.KeyboardButton('Статистика >>'),
+)
+
 CHOOSE_INTERVAL_TEXT = 'Выбери интервал'
 INTERVAL_BUTTONS = (
     types.InlineKeyboardButton('15 минут', callback_data=str(60 * 15)),
@@ -24,6 +29,7 @@ DEBUG_BUTTONS = (
 
 CHOOSE_STATS_TEXT = 'Статистика за какой период?'
 STATS_BUTTONS = types.InlineKeyboardMarkup().row(
+    types.InlineKeyboardButton('За 2 часа', callback_data='{"hours": 2}'),
     types.InlineKeyboardButton('За 24 часа', callback_data='{"days": 1}'),
     types.InlineKeyboardButton('За 7 суток', callback_data='{"weeks": 1}'),
     types.InlineKeyboardButton('За 1 месяц', callback_data='{"months": 1}'),
