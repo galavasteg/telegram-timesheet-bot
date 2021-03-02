@@ -18,9 +18,8 @@
 ## 1. Features
 
 - Default categories: `Работа`, `TimeKiller`, `Еда`, `Прогулка`, `Тренировка`, `Сон`
-- Statistics for the `last 24 hours`, `last session`, `week`, `month`
+- excel-statistics for the `last 24 hours`, `last session`, `7 days`, `1 month`
 - Intervals: `15 min`, `20 min`, `30 min`
-    - additional [debug](#3-1-before-running)-intervals: `5 sec`, `10 sec`, `30 sec`
 
 
 ## 2. Install
@@ -40,7 +39,7 @@
 ## 3. Running
 TLDR Для запуска сервера бота выполнить в терминале:
 
-`python server.py`
+`python manage.py start`
 
 ### 3.1. Before Running
 Для начала, необходимо указать следующие переменные окружения:
@@ -63,9 +62,11 @@ ACCESS_IDS_FILE = white_list_of_tg_accounts
 
 Дополнительные переменные окружения (капсом выделены значения по-умолчанию):
 ```
-# Hежим "дебаг", при котором исключения будут логироваться с трейсбэком,
-#  и появятся дополнительные кнопки выбора периодов для ускорения ручного тестирования. 
+# Режим "дебаг", при котором исключения будут логироваться с трейсбэком,
+#  и появятся дополнительные кнопки выбора периодов для ускорения тестирования:
+#  5, 10 and 30 seconds.
 DEBUG_MODE = true|FALSE
+
 # Уровень логирования.
 LOG_LEVEL = debug|INFO|error|critical
 ```
@@ -94,8 +95,7 @@ sqlite3 /home/db/finance.db
 
 ## TODO
 ### bugfix
-- latency on start or receiving messages from bot
-- [not confirmed] missing or lost categories in statistics
+- stat frame by ts, NOT by sessions
 
 ### refactoring
 - Bot Version.
@@ -109,10 +109,15 @@ sqlite3 /home/db/finance.db
 - critical and error logs on email (env)
 
 ### features
+- notify about current step before start
 - notify user about not completed activities
+    -  ask with list of activities,
+        -   fill manually
+        -   or missing all
+- stop session after 12 hours of ignore
+- reopening sessions
 - adding user's custom categories
 - on/off user categories
-- statistics: excel representation
 - timezone
 - internationalization
 

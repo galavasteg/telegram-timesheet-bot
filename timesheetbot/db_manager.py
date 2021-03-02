@@ -6,7 +6,7 @@ from typing import Tuple, List
 from uuid import uuid4 as uuid
 
 from aiogram import types
-from pypika import Table, SQLLiteQuery, Parameter, Order, Criterion
+from pypika import Table, SQLLiteQuery, Parameter, Order
 
 from settings.config import DB_NAME, DB_MIGRATIONS_DIR, DEBUG_MODE
 from settings import constants
