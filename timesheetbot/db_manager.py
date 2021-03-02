@@ -257,7 +257,7 @@ class DBManager:
         return timesheet_frame
 
     def filter_user_sessions_by_start(self, u: types.User, start: datetime) -> List[tuple]:
-        params = {'t0': start, ':user_id': u.id}
+        params = {'t0': start, 'user_id': u.id}
         query = 'SELECT * FROM session WHERE user_telegram_id = :user_id AND :t0 <= start_at'
 
         sessions_frame = self._cursor.execute(query, params).fetchall()

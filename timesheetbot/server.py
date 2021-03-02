@@ -128,7 +128,7 @@ async def start_session(message: types.Message):
     navigation_kb = get_ts_btns()
     await message.answer(reply, reply_markup=navigation_kb)
 
-    log.info('Opened session. User: ' + user.get_mention())
+    log.info('Opened session. User: %s', user.get_mention())
 
     task = asyncio.create_task(send_events_coro(user, session_id))
     stop_sending_events[user.id].append(task)
