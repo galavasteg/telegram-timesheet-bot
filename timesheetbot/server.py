@@ -77,47 +77,55 @@ async def send_events_coro(user, session_id):
 
 
 @dp.message_handler(commands=('start',))
-@dp.message_handler(lambda msg: msg.text.lower() in ('start', 'старт'))
-async def start_session(message: types.Message):
-    user = message.from_user
-
-    db.register_user_if_not_exists(user)
+@dp.message_handler(lambda msg: msg.text.lower() in ('run ', 'start', 'старт'))
+async def start_session(start_msg: types.Message):
+    await control_buttons_cmd(start_msg)
+    user = start_msg.from_user
+    await asyncio.get_running_loop().run_in_executor(None, db.register_user_if_not_exists, user)
 
     try:
         await check_activities_filled(user)
     except FoundUnfilledActivity as exc:
-        await bot.send_message(user.id, 'Заполните все предыдущие активности!')
+        # TODO try to forward not closed activities (table with msgs_id 's <-> timesheet)
+        await start_msg.answer('Заполните все предыдущие активности!')
         log.error('%s: `%s`', user.get_mention(), type(exc).__name__)
         return
 
     session_id, is_new_session = db.get_new_or_existing_session_id(user)
 
     if not is_new_session:
-        await message.answer(msgs.CLOSE_SESSION_PLS)
+        await start_msg.answer(msgs.CLOSE_SESSION_PLS)
         return
 
     interval_seconds = await get_interval(user)
-    await message.answer(
-        f'Ваш текущий интервал (мм:сс): {mm_ss_representation(interval_seconds)}\n'
+    await start_msg.answer(
+        f'Ваш текущий интервал (мм:сс): `{mm_ss_representation(interval_seconds)}`\n'
         f'У вас есть `{const.WAIT_INTERVAL_FROM_USER_BEFORE_START:d} секунд`, чтобы начать сессию с другим интервалом.',
         parse_mode='Markdown'
     )
-    await change_interval_cmd(message)
+    ask_interval_msg = await change_interval_cmd(start_msg)
 
     sleep = asyncio.create_task(asyncio.sleep(const.WAIT_INTERVAL_FROM_USER_BEFORE_START))
     user_start_interval_waiters[user.id].append(sleep)
     try:
         await sleep
-    except asyncio.CancelledError as exc:
-        pass
+    except asyncio.CancelledError:
+        msg_sender = start_msg.answer
+    else:
+        await ask_interval_msg.edit_reply_markup()
+        msg_sender = ask_interval_msg.edit_text
+
+    if not db.has_active_session(user):
+        log.info('Session start canceled. User: %s', user.get_mention())
+        await msg_sender('Вы прервали запуск сессии.')
+        return
 
     locks[user.id] = asyncio.Lock()
     interval_seconds = await get_interval(user)
-    # TODO: seconds to minutes (via datetime?)
     first_bot_msg_time = datetime.now() + timedelta(0, seconds=interval_seconds)
-    reply = msgs.FIRST_BOT_MSG.format(time=first_bot_msg_time.strftime("%H:%M:%S"))
+    text = msgs.FIRST_BOT_MSG.format(time=first_bot_msg_time.strftime("%H:%M:%S"))
 
-    await message.answer(reply, reply_markup=const.NAVIGATION_KB)
+    await msg_sender(text, parse_mode='Markdown')
 
     task = asyncio.create_task(send_events_coro(user, session_id))
     stop_sending_events[user.id].append(task)
@@ -142,15 +150,15 @@ async def check_activities_filled(u):
 async def stop_session(message: types.Message):
     user = message.from_user
 
-    stopped = db.try_stop_session(user)
-    reply = 'Остановились' if stopped else 'Нечего останавливать'
+    if stopped := db.try_stop_session(user):
+        if sending_events := stop_sending_events.pop(user.id, []):
+            [task.cancel() for task in sending_events]
+            log.info('Closed session. User: %s', message.from_user.get_mention())
+        reply = 'Сессия остановлена.'
+    else:
+        reply = 'Сессия не запущена ¯\\_(ツ)_/¯'
 
     await message.answer(reply)
-
-    if stopped and (sending_events := stop_sending_events.pop(user.id, [])):
-        [task.cancel() for task in sending_events]
-        msg = 'Closed session. User: ' + message.from_user.get_mention()
-        log.info(msg)
 
 
 @dp.message_handler(commands=('list',))
@@ -162,22 +170,23 @@ async def list_categories_cmd(message: types.Message):
 
 @dp.message_handler(commands=('buttons',))
 async def control_buttons_cmd(message: types.Message):
-    await bot.send_message(message.from_user.id, '', reply_markup=const.NAVIGATION_KB)
+    msg = 'Рисуем кнопки...' if message.text == '/buttons' else 'Стартуем...'
+    await message.answer(text=msg, reply_markup=const.NAVIGATION_KB)
 
 
 @dp.message_handler(commands=('step',))
 @dp.message_handler(lambda msg: msg.text.lower() in ('change interval', 'изменить интервал'))
-async def change_interval_cmd(message: types.Message):
+async def change_interval_cmd(message: types.Message) -> types.Message:
     buttons = types.InlineKeyboardMarkup().row(*const.INTERVAL_BUTTONS)
     if settings.DEBUG_MODE:
         buttons.row(*const.DEBUG_BUTTONS)
 
-    await bot.send_message(message.from_user.id, const.CHOOSE_INTERVAL_TEXT, reply_markup=buttons)
+    return await bot.send_message(message.from_user.id, const.CHOOSE_INTERVAL_TEXT, reply_markup=buttons)
 
 
 @dp.callback_query_handler(lambda c: c.message.text == const.CHOOSE_INTERVAL_TEXT)
 async def set_replied_interval(callback_query: types.CallbackQuery):
-    request_message = callback_query.message
+    ask_interval_msg = callback_query.message
     user = callback_query.from_user
     interval_seconds = int(callback_query.data)
 
@@ -185,10 +194,10 @@ async def set_replied_interval(callback_query: types.CallbackQuery):
     [task.cancel() for task in user_start_interval_waiters[user.id]]
 
     # todo: interactive edit markup
-    await request_message.edit_reply_markup()
+    await ask_interval_msg.edit_reply_markup()
     interval_repr = mm_ss_representation(interval_seconds)  # %M:%S
-    await request_message.edit_text(
-        request_message.text + f'\nУстановлен интервал (мм:сс): `{interval_repr}` .',
+    await ask_interval_msg.edit_text(
+        f'\nУстановлен интервал (мм:сс): `{interval_repr}` .',
         parse_mode='Markdown',
     )
 

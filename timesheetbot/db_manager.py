@@ -31,7 +31,7 @@ class DoesNotExist(Exception):
 class DBManager:
 
     def __init__(self):
-        self._con = sqlite3.Connection(DB_NAME)
+        self._con = sqlite3.connect(DB_NAME, check_same_thread=False)
         if DEBUG_MODE:
             self._con.set_trace_callback(log.debug)
         self._cursor = self._con.cursor()

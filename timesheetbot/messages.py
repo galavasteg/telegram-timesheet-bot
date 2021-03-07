@@ -46,6 +46,6 @@ WELCOME = (
     f'{_base_cmds_s}\n\n'
 )
 
-FIRST_BOT_MSG = 'Бот пришлет первое сообщение в {time}.'
+FIRST_BOT_MSG = 'Бот пришлет первое сообщение в `{time}`.'
 
 CLOSE_SESSION_PLS = 'Обнаружена незавершенная сессия. /stop ее и /start новую.'

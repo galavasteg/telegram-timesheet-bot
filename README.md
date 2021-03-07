@@ -109,7 +109,6 @@ sqlite3 /home/db/finance.db
 - critical and error logs on email (env)
 
 ### features
-- notify about current step before start
 - notify user about not completed activities
     -  ask with list of activities,
         -   fill manually
